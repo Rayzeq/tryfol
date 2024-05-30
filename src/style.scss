@@ -1,0 +1,270 @@
+$color1: #66aced;
+$color2: #4fb9eb;
+$color3: #4ac6e2;
+$color4: #58d1d7;
+$color5: #73daca;
+$color6: #59d5f1;
+$color7: #7ec9ff;
+$color8: #bfb5ff;
+$color9: #f79aec;
+$color10: #fd8dce;
+$color11: #fd81af;
+$color12: #f7768e;
+
+@keyframes blink-warning {
+	from {
+		color: white;
+	}
+
+	to {
+		color: orange;
+	}
+}
+
+@keyframes blink-critical {
+	from {
+		color: white;
+		text-shadow: 1px 1px 10px white;
+	}
+
+	to {
+		color: red;
+		text-shadow: 1px 1px 10px red;
+	}
+}
+
+* {
+	all: unset;
+}
+
+#main {
+	padding: 4px;
+	font-size: 14px;
+}
+
+tooltip,
+popover,
+calendar {
+	background-color: rgba(0, 0, 0, 0.8);
+	color: $color4;
+}
+
+tooltip {
+	border-radius: 20px;
+	padding: 3px 10px 5px 10px;
+}
+
+popover {
+	border-radius: 10px;
+
+	&.menu {
+		margin-top: 5px;
+		padding: 5px 0px;
+
+		modelbutton {
+			padding: 1px 7px;
+
+			&:disabled label {
+				color: gray;
+			}
+
+			&:hover {
+				background-color: #0e4679;
+			}
+
+			// nested sub-menus
+			popover.menu {
+				margin-top: 0px;
+				padding-top: 0px;
+				padding-bottom: 0px;
+				border-top-left-radius: 0px;
+				border-bottom-left-radius: 0px;
+			}
+		}
+
+		separator {
+			margin: 3px 0px;
+			background-color: #444444;
+			padding-top: 1px;
+
+			&:last-child {
+				padding: unset;
+			}
+		}
+	}
+
+	&#calendar {
+		margin-top: 1px;
+	}
+
+	calendar {
+		// why tf is this needed ??
+		border-radius: 10px;
+		padding: 5px;
+
+		button:hover {
+			color: white;
+		}
+
+		stack.month,
+		label.year,
+		label.day-name,
+		label.week-number {
+			color: lightgray;
+		}
+
+		label.day-number {
+			margin: 0px 4px;
+			padding: 2px 0px;
+			border-radius: 50%;
+		}
+
+		label.other-month {
+			color: rgb(80, 80, 80);
+		}
+
+		label:selected {
+			background-color: rgba(80, 80, 80, 0.8);
+		}
+
+		label.today {
+			background-color: rgba(255, 0, 255, 0.3);
+		}
+	}
+}
+
+.module {
+	margin: 1px 3px;
+	border-radius: 20px;
+	padding: 0.25rem 0.75rem;
+
+	background-color: rgba(0, 0, 0, 0.8);
+
+	.left {
+		margin-left: 2px;
+		margin-right: 8px;
+		border-right: 1px solid #404040;
+		padding-right: 8px;
+	}
+
+	.right {
+		margin-right: 2px;
+		margin-left: 6px;
+		border-left: 1px solid #404040;
+		padding-left: 8px;
+	}
+}
+
+#workspaces {
+	font-size: 16px;
+
+	button {
+		margin-bottom: 1px;
+		border-bottom: 1px solid transparent;
+
+		&.active {
+			border-color: #ff4499;
+		}
+
+		label {
+			margin-top: 1px;
+			border-radius: 20px;
+			padding-left: 1em;
+			padding-right: 1em;
+
+			color: $color1;
+		}
+
+		&:hover label {
+			transition: background-color 0.6s;
+			background-color: rgba(70, 70, 70, 0.8);
+		}
+	}
+}
+
+#mpris {
+	color: $color2;
+}
+
+#window {
+	font-weight: bold;
+	color: $color3;
+}
+
+#clock {
+	color: $color5;
+}
+
+#connectivity {
+	color: $color6;
+}
+
+#temperatures {
+	color: $color7;
+
+	.high {
+		color: red;
+	}
+
+	.critical {
+		animation: blink-critical 500ms linear infinite alternate-reverse;
+	}
+}
+
+#memory {
+	color: $color8;
+
+	&.warning {
+		color: orange;
+	}
+
+	&.critical {
+		animation: blink-critical 500ms linear infinite alternate-reverse;
+	}
+}
+
+#cpu {
+	color: $color9;
+
+	.warning {
+		color: orange;
+	}
+
+	.critical {
+		color: red;
+	}
+}
+
+#battery {
+	color: $color10;
+
+	.warning {
+		color: orange;
+	}
+
+	.critical {
+		color: red;
+	}
+
+	.discharging {
+		&.warning {
+			animation: blink-warning 250ms linear infinite alternate-reverse;
+		}
+
+		&.critical {
+			animation: blink-critical 250ms linear infinite alternate-reverse;
+		}
+	}
+}
+
+#audio {
+	color: $color11;
+
+	label.muted {
+		color: red;
+	}
+}
+
+#power {
+	color: $color12;
+}

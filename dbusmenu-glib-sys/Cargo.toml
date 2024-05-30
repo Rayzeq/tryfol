@@ -1,0 +1,44 @@
+[package]
+categories = ["api-bindings", "gui"]
+description = "FFI bindings to dbusmenu-glib"
+homepage = "https://github.com/ralismark/dbusmenu-rs"
+keywords = ["gtk-rs"]
+license = "LGPL-3.0-only"
+links = "dbusmenu-glib"
+readme = "/nix/store/bh99v42b66biz6yk9xxi7mzl0yhwwdd5-README.md"
+repository = "https://github.com/ralismark/dbusmenu-rs"
+name = "dbusmenu-glib-sys"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[package.metadata.system-deps.dbusmenu_glib_0_4]
+name = "dbusmenu-glib-0.4"
+version = "16"
+
+[package.metadata.docs.rs]
+features = ["dox"]
+
+[lib]
+name = "dbusmenu_glib_sys"
+
+[dependencies]
+libc = "0.2"
+
+[dependencies.glib]
+package = "glib-sys"
+version = ">=0.15"
+
+[dependencies.gobject]
+package = "gobject-sys"
+version = ">=0.15"
+
+[build-dependencies]
+system-deps = "6"
+
+[dev-dependencies]
+shell-words = "1.0.0"
+tempfile = "3"
+
+[features]
+dox = ["glib/dox", "gobject/dox"]
