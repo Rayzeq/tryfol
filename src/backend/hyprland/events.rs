@@ -1,25 +1,17 @@
 use anyhow::{anyhow, Context};
 use async_stream::stream;
-use core::fmt::{self, Display};
 use futures::Stream;
-use std::path::Path;
-use tokio::{io::AsyncReadExt, net::UnixStream};
+use std::{io, path::Path};
+use tokio::net::UnixStream;
 
-#[derive(Clone, Copy, Debug)]
-pub struct WorkspaceId(pub i32);
-
-#[derive(Clone, Copy, Debug)]
-pub struct WindowAddress(pub u32);
+use super::{WindowAddress, Workspace};
 
 #[derive(Clone, Debug)]
 pub enum Event {
     Workspace {
         name: String,
     },
-    WorkspaceV2 {
-        id: WorkspaceId,
-        name: String,
-    },
+    WorkspaceV2(Workspace),
     FocusedMonitor,
     ActiveWindow {
         class: String,
@@ -31,15 +23,9 @@ pub enum Event {
     MonitorAdded,
     MonitorAddedV2,
     CreateWorkspace,
-    CreateWorkspaceV2 {
-        id: WorkspaceId,
-        name: String,
-    },
+    CreateWorkspaceV2(Workspace),
     DestroyWorkspace,
-    DestroyWorkspaceV2 {
-        id: WorkspaceId,
-        name: String,
-    },
+    DestroyWorkspaceV2(Workspace),
     MoveWorkspace,
     MoveWorkspaceV2,
     RenameWorkspace,
@@ -75,30 +61,6 @@ pub struct EventSocket {
     socket: UnixStream,
 }
 
-impl WorkspaceId {
-    pub fn from(id: &str) -> anyhow::Result<Self> {
-        Ok(Self(id.parse().context("Invalid workspace id")?))
-    }
-
-    pub const fn is_special(self) -> bool {
-        self.0 < 0
-    }
-}
-
-impl WindowAddress {
-    pub fn from(address: &str) -> anyhow::Result<Self> {
-        Ok(Self(
-            u32::from_str_radix(address, 16).context("Invalid workspace id")?,
-        ))
-    }
-}
-
-impl Display for WindowAddress {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:#x}", self.0)
-    }
-}
-
 impl Event {
     pub fn from(string: &str) -> anyhow::Result<Self> {
         let (name, arguments) = string.split_once(">>").context("Malformed event")?;
@@ -107,11 +69,9 @@ impl Event {
             "workspace" => Self::Workspace {
                 name: arguments.to_owned(),
             },
-            "workspacev2" => {
-                let (id, name) =
-                    Self::parse_full_workspace(arguments).context("While parsing `workspacev2`")?;
-                Self::WorkspaceV2 { id, name }
-            }
+            "workspacev2" => Self::WorkspaceV2(
+                Self::parse_full_workspace(arguments).context("While parsing `workspacev2`")?,
+            ),
             "focusedmon" => Self::FocusedMonitor,
             "activewindow" => {
                 let (class, title) = arguments
@@ -129,17 +89,15 @@ impl Event {
             "monitoradded" => Self::MonitorAdded,
             "monitoraddedv2" => Self::MonitorAddedV2,
             "createworkspace" => Self::CreateWorkspace,
-            "createworkspacev2" => {
-                let (id, name) = Self::parse_full_workspace(arguments)
-                    .context("While parsing `createworkspacev2`")?;
-                Self::CreateWorkspaceV2 { id, name }
-            }
+            "createworkspacev2" => Self::CreateWorkspaceV2(
+                Self::parse_full_workspace(arguments)
+                    .context("While parsing `createworkspacev2`")?,
+            ),
             "destroyworkspace" => Self::DestroyWorkspace,
-            "destroyworkspacev2" => {
-                let (id, name) = Self::parse_full_workspace(arguments)
-                    .context("While parsing `destroyworkspacev2`")?;
-                Self::DestroyWorkspaceV2 { id, name }
-            }
+            "destroyworkspacev2" => Self::DestroyWorkspaceV2(
+                Self::parse_full_workspace(arguments)
+                    .context("While parsing `destroyworkspacev2`")?,
+            ),
             "moveworkspace" => Self::MoveWorkspace,
             "moveworkspacev2" => Self::MoveWorkspaceV2,
             "renameworkspace" => Self::RenameWorkspace,
@@ -183,10 +141,9 @@ impl Event {
         })
     }
 
-    fn parse_full_workspace(arguments: &str) -> anyhow::Result<(WorkspaceId, String)> {
+    fn parse_full_workspace(arguments: &str) -> anyhow::Result<Workspace> {
         let (id, name) = arguments.split_once(',').context("Malformed arguments")?;
-
-        Ok((WorkspaceId::from(id)?, name.to_owned()))
+        Workspace::from_raw(id, name.to_owned())
     }
 }
 
@@ -209,20 +166,45 @@ impl EventSocket {
         Ok(Self { socket })
     }
 
-    pub fn events(mut self) -> impl Stream<Item = Result<Event, anyhow::Error>> {
-        stream! {
-            let mut data = String::new();
+    pub fn events(self) -> impl Stream<Item = Result<Event, anyhow::Error>> {
+        let mut data = Vec::new();
 
+        stream! {
             loop {
                 self.socket
-                    .read_to_string(&mut data)
+                    .readable()
                     .await
-                    .context("Error while reading from Hyprland event socket")?;
-                for message in data.split('\n') {
-                    yield Event::from(message);
-                }
+                    .context("Error while waiting for readiness of Hyprland event socket")?;
 
-                data.clear();
+                match self.socket.try_read_buf(&mut data) {
+                    Ok(_) => {
+                        let data_str = match std::str::from_utf8(&data) {
+                            Ok(x) => x,
+                            Err(e) => {
+                                data.clear();
+                                Err(e).context("Invalid utf8 received from Hyprland event socket")?
+                            }
+                        };
+                        let (messages, end) = data_str.rsplit_once('\n').unwrap_or(("", data_str));
+                        let end = end.to_owned();
+
+                        if !messages.is_empty() {
+                            for message in messages.split('\n') {
+                                yield Event::from(message);
+                            }
+                        }
+
+                        data.clear();
+                        data.extend_from_slice(end.as_bytes());
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        continue;
+                    }
+                    Err(e) => {
+                        data.clear();
+                        Err(e).context("Error while reading from Hyprland event socket")?;
+                    }
+                }
             }
         }
     }
