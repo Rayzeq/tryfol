@@ -1,3 +1,4 @@
+use crate::backend::hyprland::{self, Workspace};
 use futures::{pin_mut, StreamExt};
 use gtk::{
     gio::{SocketClient, UnixSocketAddress},
@@ -8,10 +9,7 @@ use gtk::{
 };
 use gtk4 as gtk;
 use lazy_static::lazy_static;
-use serde::{de::DeserializeOwned, Deserialize};
 use std::path::Path;
-
-use crate::backend::hyprland::{self, Workspace as WorkspaceV2};
 
 #[derive(Debug)]
 pub struct Modules {
@@ -34,14 +32,15 @@ pub fn new() -> Modules {
 
     glib::spawn_future_local(clone!(@strong workspaces, @strong window => async move {
         let mut workspace_map = Vec::new();
-        let events = hyprland::EventSocket::new().await.unwrap().events();
+        let events = hyprland::events().await.unwrap();
         pin_mut!(events);
 
-        for workspace in hyprctl::<Vec<Workspace>>("workspaces").await {
-            add_workspace(workspace.id, &mut workspace_map, &workspaces);
+        for workspace in hyprland::workspaces().await.unwrap() {
+            let Ok(id) = workspace.id.try_into() else {continue;};
+            add_workspace(id, &mut workspace_map, &workspaces);
         }
 
-        let active_id: Option<u32> = hyprctl::<Workspace>("activeworkspace").await.id.try_into().ok();
+        let active_id: Option<u32> = hyprland::active_workspace().await.unwrap().id.try_into().ok();
         if let Some((_, old)) =
                 active_id.and_then(|active_id| workspace_map.iter().find(|(id, _)| *id == active_id))
             {
@@ -49,7 +48,7 @@ pub fn new() -> Modules {
             }
         let mut active_workspace = active_id;
 
-        let active_window = hyprctl::<Window>("activewindow").await;
+        let active_window = hyprland::active_window().await.unwrap();
         if !active_window.title.is_empty() {
             window.set_visible(true);
             window.set_markup(&format_window(&active_window.class, &active_window.title));
@@ -73,7 +72,7 @@ async fn handle_message(
     window: &Label,
 ) {
     match event {
-        hyprland::Event::WorkspaceV2(WorkspaceV2::Regular { id, .. }) => {
+        hyprland::Event::WorkspaceV2(Workspace::Regular { id, .. }) => {
             if let Some((_, old)) =
                 active_workspace.and_then(|id| workspace_map.iter().find(|(i, _)| *i == id))
             {
@@ -92,10 +91,10 @@ async fn handle_message(
                 window.set_markup(&format_window(&class, &title));
             }
         }
-        hyprland::Event::CreateWorkspaceV2(WorkspaceV2::Regular { id, .. }) => {
+        hyprland::Event::CreateWorkspaceV2(Workspace::Regular { id, .. }) => {
             add_workspace(id, workspace_map, workspaces);
         }
-        hyprland::Event::DestroyWorkspaceV2(WorkspaceV2::Regular { id, .. }) => {
+        hyprland::Event::DestroyWorkspaceV2(Workspace::Regular { id, .. }) => {
             if let Some((_, button)) = workspace_map
                 .iter()
                 .position(|(i, _)| *i == id)
@@ -164,52 +163,6 @@ fn format_window(class: &str, title: &str) -> String {
     title
 }
 
-#[allow(non_snake_case, dead_code)]
-#[derive(Deserialize, Debug)]
-struct Workspace {
-    pub id: u32,
-    pub name: String,
-    pub monitor: String,
-    pub monitorID: usize,
-    pub windows: usize,
-    pub hasfullscreen: bool,
-    pub lastwindow: String,
-    pub lastwindowtitle: String,
-}
-
-#[allow(non_snake_case, dead_code)]
-#[derive(Deserialize, Debug)]
-struct WorkspaceShort {
-    pub id: u32,
-    pub name: String,
-}
-
-#[allow(non_snake_case, dead_code, clippy::struct_excessive_bools)]
-#[derive(Deserialize, Debug)]
-struct Window {
-    pub address: String,
-    pub mapped: bool,
-    pub hidden: bool,
-    pub at: (usize, usize),
-    pub size: (usize, usize),
-    pub workspace: WorkspaceShort,
-    pub floating: bool,
-    pub monitor: usize,
-    pub class: String,
-    pub title: String,
-    pub initialClass: String,
-    pub initialTitle: String,
-    pub pid: usize,
-    pub xwayland: bool,
-    pub pinned: bool,
-    pub fullscreen: bool,
-    pub fullscreenMode: usize,
-    pub fakeFullscreen: bool,
-    pub grouped: Vec<()>,
-    pub swallowing: String,
-    pub focusHistoryID: usize,
-}
-
 async fn hyprctl_dispatch(command: &[&str]) {
     let socket = SocketClient::new()
         .connect_future(&UnixSocketAddress::new(
@@ -240,36 +193,6 @@ async fn hyprctl_dispatch(command: &[&str]) {
     if data != "ok" {
         println!("error in `dispatch {}`: {data}", command.join(" "));
     }
-}
-
-async fn hyprctl<T: DeserializeOwned>(command: &str) -> T {
-    let socket = SocketClient::new()
-        .connect_future(&UnixSocketAddress::new(
-            &Path::new(&std::env::var("XDG_RUNTIME_DIR").expect("Missing $XDG_RUNTIME_DIR"))
-                .join("hypr")
-                .join(
-                    std::env::var("HYPRLAND_INSTANCE_SIGNATURE")
-                        .expect("Can't find hyprland socket"),
-                )
-                .join(".socket.sock"),
-        ))
-        .await
-        .expect("can't connect to hyprland socket");
-
-    let command = "j/".to_owned() + command;
-    socket
-        .output_stream()
-        .write_bytes_future(&Bytes::from_owned(command), Priority::DEFAULT)
-        .await
-        .expect("cannot write to hyprland socket");
-
-    let data = socket
-        .input_stream()
-        .read_bytes_future(32768, Priority::DEFAULT)
-        .await
-        .expect("cannot read from hyprland socket");
-
-    serde_json::from_slice(&data).expect("hyprland sent invalid data over the socket")
 }
 
 trait NumberExt {
