@@ -1,16 +1,11 @@
-use anyhow::Context;
+use super::{WindowAddress, WindowInfos, WorkspaceId, WorkspaceInfos};
+use anyhow::{anyhow, Context};
 use std::{
     io::{self, ErrorKind, Write},
     os::unix::net::UnixStream as StdUnixStream,
     time::Duration,
 };
 use tokio::{io::AsyncReadExt, net::UnixStream, time::sleep};
-
-use super::{WindowInfos, WorkspaceInfos};
-
-pub async fn test() {
-    println!("{:?}", active_window().await);
-}
 
 pub async fn active_workspace() -> anyhow::Result<WorkspaceInfos> {
     let response = raw_request(&['j'], "activeworkspace").await?;
@@ -25,6 +20,31 @@ pub async fn active_window() -> anyhow::Result<WindowInfos> {
 pub async fn workspaces() -> anyhow::Result<Vec<WorkspaceInfos>> {
     let response = raw_request(&['j'], "workspaces").await?;
     serde_json::from_slice(&response).context("Invalid data while parsing workspaces infos")
+}
+
+// TODO: there are a lot of other ways to change workspaces
+pub async fn change_workspace(id: WorkspaceId) -> anyhow::Result<()> {
+    dispatch(&("workspace ".to_owned() + &id.to_string())).await
+}
+
+// TODO: there are a lot of different selectors
+pub async fn close_window(address: WindowAddress) -> anyhow::Result<()> {
+    dispatch(&("closewindow address:".to_owned() + &address.to_string())).await
+}
+
+async fn dispatch(dispatcher: &str) -> anyhow::Result<()> {
+    let command = "dispatch ".to_owned() + dispatcher;
+    let response = raw_request(&[], &command).await?;
+
+    if response == b"ok" {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Dispatcher `{}` failed: {}",
+            dispatcher,
+            String::from_utf8_lossy(&response)
+        ))
+    }
 }
 
 async fn raw_request(flags: &[char], command: &str) -> anyhow::Result<Vec<u8>> {
@@ -45,8 +65,12 @@ async fn raw_request(flags: &[char], command: &str) -> anyhow::Result<Vec<u8>> {
 }
 
 async fn raw_request_noretry(flags: &[char], command: &str) -> anyhow::Result<Vec<u8>> {
-    let flags: String = flags.iter().collect();
-    let command = format!("{flags}/{command}");
+    let command = if flags.is_empty() {
+        command.to_owned()
+    } else {
+        let flags: String = flags.iter().collect();
+        format!("{flags}/{command}")
+    };
 
     // The "open then write" operation must take less than 5ms to execute, otherwise Hyprland will close the socket.
     // This is why we use the sync api there, if there is await points, this will slow down things.

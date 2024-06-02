@@ -1,10 +1,9 @@
+use super::{WindowAddress, Workspace};
 use anyhow::{anyhow, Context};
 use async_stream::stream;
 use futures::Stream;
-use std::{io, path::Path};
+use std::io;
 use tokio::net::UnixStream;
-
-use super::{WindowAddress, Workspace};
 
 #[derive(Clone, Debug)]
 pub enum Event {

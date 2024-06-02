@@ -1,15 +1,13 @@
-use crate::backend::hyprland::{self, Workspace};
+use crate::backend::hyprland::{self, Workspace, WorkspaceId};
 use futures::{pin_mut, StreamExt};
 use gtk::{
-    gio::{SocketClient, UnixSocketAddress},
-    glib::{self, clone, Bytes, Priority},
+    glib::{self, clone},
     pango::EllipsizeMode,
     prelude::*,
     Button, Label,
 };
 use gtk4 as gtk;
 use lazy_static::lazy_static;
-use std::path::Path;
 
 #[derive(Debug)]
 pub struct Modules {
@@ -107,7 +105,7 @@ async fn handle_message(
             if AUTOKILL.contains(&title.as_str())
             /*|| (class == "sublime_text" && title.is_empty())*/
             {
-                hyprctl_dispatch(&["closewindow", &format!("address:{address}")]).await;
+                hyprland::close_window(address).await.unwrap();
             }
         }
         _ => (),
@@ -118,7 +116,7 @@ fn add_workspace(id: u32, workspace_map: &mut Vec<(u32, Button)>, workspaces: &g
     let button = Button::with_label(&id.to_japanese());
     button.connect_clicked(move |_| {
         glib::spawn_future_local(async move {
-            hyprctl_dispatch(&["workspace", &id.to_string()]).await;
+            hyprland::change_workspace(id as WorkspaceId).await.unwrap();
         });
     });
 
@@ -161,38 +159,6 @@ fn format_window(class: &str, title: &str) -> String {
     }
 
     title
-}
-
-async fn hyprctl_dispatch(command: &[&str]) {
-    let socket = SocketClient::new()
-        .connect_future(&UnixSocketAddress::new(
-            &Path::new(&std::env::var("XDG_RUNTIME_DIR").expect("Missing $XDG_RUNTIME_DIR"))
-                .join("hypr")
-                .join(
-                    std::env::var("HYPRLAND_INSTANCE_SIGNATURE")
-                        .expect("Can't find hyprland socket"),
-                )
-                .join(".socket.sock"),
-        ))
-        .await
-        .expect("can't connect to hyprland socket");
-
-    let full_command = "dispatch ".to_owned() + &command.join(" ");
-    socket
-        .output_stream()
-        .write_bytes_future(&Bytes::from_owned(full_command), Priority::DEFAULT)
-        .await
-        .expect("cannot write to hyprland socket");
-
-    let data = socket
-        .input_stream()
-        .read_bytes_future(32768, Priority::DEFAULT)
-        .await
-        .expect("cannot read from hyprland socket");
-    let data = std::str::from_utf8(&data).expect("invalid utf8 received from hyprland");
-    if data != "ok" {
-        println!("error in `dispatch {}`: {data}", command.join(" "));
-    }
 }
 
 trait NumberExt {
