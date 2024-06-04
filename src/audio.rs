@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use gtk::{
     glib::{self, clone, prelude::ObjectExt, Propagation, Value, Variant, VariantDict},
     prelude::*,
@@ -34,7 +36,7 @@ pub fn new() -> gtk::Box {
 
     glib::spawn_future_local(async move {
         wireplumber::Core::init();
-        let core = wireplumber::Core::new(None, None);
+        let core = wireplumber::Core::new(None, None, None);
 
         let manager = ObjectManager::new();
         manager.add_interest(ObjectInterest::new(Node::static_type()));
@@ -43,10 +45,24 @@ pub fn new() -> gtk::Box {
         manager.request_object_features(Node::static_type(), ObjectFeatures::with_bits(17));
         manager.request_object_features(Device::static_type(), ObjectFeatures::with_bits(17));
 
-        core.load_component("libwireplumber-module-default-nodes-api", "module", None)
-            .unwrap();
-        core.load_component("libwireplumber-module-mixer-api", "module", None)
-            .unwrap();
+        core.connect_future().await.unwrap();
+
+        core.load_component_future(
+            Some(Cow::Borrowed("libwireplumber-module-default-nodes-api")),
+            "module",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        core.load_component_future(
+            Some(Cow::Borrowed("libwireplumber-module-mixer-api")),
+            "module",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         let def_nodes_api = Plugin::find(&core, "default-nodes-api").unwrap();
         let mixer_api = Plugin::find(&core, "mixer-api").unwrap();
@@ -58,8 +74,6 @@ pub fn new() -> gtk::Box {
                 .transform_with_type(WpMixerApiVolumeScale)
                 .unwrap(),
         );
-
-        core.connect_future().await.unwrap();
 
         // this MUST be before def_nodes_api.activate_future(...), otherwise it won't work
         def_nodes_api.connect_local(

@@ -2589,7 +2589,7 @@ dependencies = [
 
 [[package]]
 name = "wireplumber"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bitflags 2.5.0",
  "futures-channel",
@@ -2602,12 +2602,13 @@ dependencies = [
  "pipewire-sys",
  "pkg-config",
  "semver",
+ "serde",
  "wireplumber-sys",
 ]
 
 [[package]]
 name = "wireplumber-sys"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "gio-sys",
  "glib-sys",
