@@ -1,11 +1,11 @@
-use std::borrow::Cow;
-
+use crate::widget_ext::HasTooltip;
 use gtk::{
     glib::{self, clone, prelude::ObjectExt, Propagation, Value, Variant, VariantDict},
     prelude::*,
     Button, EventControllerScroll, EventControllerScrollFlags, Label, Orientation,
 };
 use gtk4 as gtk;
+use std::borrow::Cow;
 use wireplumber::{
     core::ObjectFeatures,
     plugin::{Plugin, PluginFeatures},
@@ -202,11 +202,16 @@ async fn refresh(
             input_label.set_text(&format!("{icons} {volume:.0}%"));
             input_label.remove_css_class("muted");
         }
-        input_label.set_tooltip_text(input.get_pw_property("node.description").as_deref());
+        input_label.set_better_tooltip(
+            input
+                .get_pw_property("node.description")
+                .as_deref()
+                .map(ToOwned::to_owned),
+        );
     } else {
         input_label.set_text("?");
         input_label.add_css_class("muted");
-        input_label.set_tooltip_text(None);
+        input_label.set_better_tooltip(None);
     }
 
     if let Some(output) = get_default_output(def_nodes_api, manager) {
@@ -254,11 +259,16 @@ async fn refresh(
             output_label.set_text(&format!("{volume:.0}% {icons}"));
             output_label.remove_css_class("muted");
         }
-        output_label.set_tooltip_text(output.get_pw_property("node.description").as_deref());
+        output_label.set_better_tooltip(
+            output
+                .get_pw_property("node.description")
+                .as_deref()
+                .map(ToOwned::to_owned),
+        );
     } else {
         output_label.set_text("?");
         output_label.add_css_class("muted");
-        output_label.set_tooltip_text(None);
+        output_label.set_better_tooltip(None);
     }
 }
 

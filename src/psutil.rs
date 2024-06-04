@@ -1,3 +1,4 @@
+use crate::widget_ext::HasTooltip;
 use gtk::{
     glib::{self, clone},
     prelude::*,
@@ -181,8 +182,8 @@ fn update(
         " @ {:.2}GHz",
         psutil::cpu::cpu_freq().unwrap().unwrap().current() / 1000.
     ));
-    cpu.set_tooltip_markup(Some(
-        &cpu_collector
+    cpu.set_better_tooltip_markup(Some(
+        cpu_collector
             .cpu_percent_percpu()
             .unwrap()
             .into_iter()

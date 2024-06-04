@@ -27,6 +27,7 @@ mod psutil;
 mod rfkill;
 mod systray;
 mod things;
+mod widget_ext;
 
 fn left_modules() -> gtk::Box {
     let hyprland::Modules { workspaces, window } = hyprland::new();

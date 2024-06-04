@@ -1,4 +1,7 @@
-use crate::backend::hyprland::{self, Workspace, WorkspaceId};
+use crate::{
+    backend::hyprland::{self, Workspace, WorkspaceId},
+    widget_ext::HasTooltip,
+};
 use futures::{pin_mut, StreamExt};
 use gtk::{
     glib::{self, clone},
@@ -86,7 +89,10 @@ async fn handle_message(
                 window.set_visible(false);
             } else {
                 window.set_visible(true);
-                window.set_markup(&format_window(&class, &title));
+                let title = format_window(&class, &title);
+                window.set_markup(&title);
+                // if i want to see the not trunctated title
+                window.set_better_tooltip_markup(Some(title));
             }
         }
         hyprland::Event::CreateWorkspaceV2(Workspace::Regular { id, .. }) => {

@@ -1,3 +1,4 @@
+use crate::widget_ext::HasTooltip;
 use futures::StreamExt;
 use gtk::{
     gdk,
@@ -250,7 +251,7 @@ async fn update_device(
             .get(device.Icon().await.unwrap().as_str())
             .unwrap_or(&"?"),
     );
-    widget.set_tooltip_text(Some(&device.Alias().await.unwrap()));
+    widget.set_better_tooltip(Some(device.Alias().await.unwrap()));
 
     let is_now_connected = device.Connected().await.unwrap();
 

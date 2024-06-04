@@ -1,3 +1,4 @@
+use crate::{dbusmenu::DBusMenu, notifier_host, widget_ext::HasTooltip};
 use futures::StreamExt;
 use gtk::{
     gdk,
@@ -7,8 +8,6 @@ use gtk::{
 };
 use gtk4 as gtk;
 use std::{cell::RefCell, collections::HashMap, future::Future, rc::Rc};
-
-use crate::{dbusmenu::DBusMenu, notifier_host};
 
 pub fn new() -> gtk::Box {
     let container = gtk::Box::new(Orientation::Horizontal, 2);
@@ -193,7 +192,7 @@ impl Item {
         }
 
         // set title
-        widget.set_tooltip_text(Some(&item.sni.title().await?));
+        widget.set_better_tooltip(Some(item.sni.title().await?));
 
         // set icon
         let scale = icon.scale_factor();
@@ -278,7 +277,7 @@ impl Item {
                 }
                 Some(_) = title_updates.next() => {
                     // set title
-                    widget.set_tooltip_text(Some(&item.sni.title().await?));
+                    widget.set_better_tooltip(Some(item.sni.title().await?));
                 }
                 Some(_) = icon_updates.next() => {
                     // set icon

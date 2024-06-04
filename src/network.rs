@@ -1,3 +1,4 @@
+use crate::{rfkill, widget_ext::HasTooltip};
 use anyhow::Context;
 use futures::{future::Either, FutureExt, Stream, StreamExt, TryStream, TryStreamExt};
 use genetlink::GenetlinkHandle;
@@ -29,8 +30,6 @@ use std::{
     time::{Duration, SystemTime},
 };
 use wl_nl80211::Nl80211Attr;
-
-use crate::rfkill;
 
 #[derive(Debug)]
 struct Route {
@@ -202,7 +201,7 @@ async fn update(
 
     icon.set_text(icon_);
     stats.set_text(&stats_);
-    container.set_tooltip_text(Some(&tooltip));
+    container.set_better_tooltip(Some(tooltip));
 
     *route = new_route;
 }
