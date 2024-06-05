@@ -14,14 +14,14 @@ pub type MonitorId = i128;
 
 #[derive(Debug, Deserialize)]
 struct RawWorkspace {
-    id: i32,
+    id: WorkspaceId,
     name: String,
 }
 
 #[derive(Clone, Debug)]
 pub enum Workspace {
-    Regular { id: u32, name: String },
-    Special { id: i32, name: String },
+    Regular { id: WorkspaceId, name: String },
+    Special { id: WorkspaceId, name: String },
 }
 
 #[allow(dead_code)]
@@ -77,10 +77,11 @@ pub struct WindowInfos {
 pub struct WindowAddress(pub u32);
 
 impl Workspace {
-    pub fn from(id: i32, name: String) -> Self {
-        match u32::try_from(id) {
-            Ok(id) => Self::Regular { id, name },
-            Err(_) => Self::Special { id, name },
+    pub const fn from(id: i32, name: String) -> Self {
+        if id < 0 {
+            Self::Special { id, name }
+        } else {
+            Self::Regular { id, name }
         }
     }
 
@@ -97,6 +98,16 @@ impl<'de> Deserialize<'de> for Workspace {
     {
         let raw = RawWorkspace::deserialize(deserializer)?;
         Ok(Self::from(raw.id, raw.name))
+    }
+}
+
+impl WorkspaceInfos {
+    pub const fn is_regular(&self) -> bool {
+        !self.is_special()
+    }
+
+    pub const fn is_special(&self) -> bool {
+        self.id < 0
     }
 }
 

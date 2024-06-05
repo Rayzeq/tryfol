@@ -12,9 +12,17 @@ pub async fn active_workspace() -> anyhow::Result<WorkspaceInfos> {
     serde_json::from_slice(&response).context("Invalid data while parsing active workspace infos")
 }
 
-pub async fn active_window() -> anyhow::Result<WindowInfos> {
+pub async fn active_window() -> anyhow::Result<Option<WindowInfos>> {
     let response = raw_request(&['j'], "activewindow").await?;
-    serde_json::from_slice(&response).context("Invalid data while parsing active window infos")
+
+    Ok(if response == b"{}" {
+        None
+    } else {
+        Some(
+            serde_json::from_slice(&response)
+                .context("Invalid data while parsing active window infos")?,
+        )
+    })
 }
 
 pub async fn workspaces() -> anyhow::Result<Vec<WorkspaceInfos>> {
