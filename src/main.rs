@@ -18,7 +18,6 @@ mod brigthness;
 mod clock;
 mod dbusmenu;
 mod extensions;
-mod hyprland;
 mod modules;
 mod mpris;
 mod network;
@@ -30,8 +29,10 @@ mod systray;
 mod things;
 pub use extensions::*;
 
+use modules::*;
+
 fn left_modules() -> gtk::Box {
-    let hyprland::Modules { workspaces, window } = hyprland::new();
+    let hyprland::Modules { workspaces, window } = hyprland::Modules::new();
 
     let modules = gtk::Box::new(Orientation::Horizontal, 0);
     modules.append(&workspaces);
