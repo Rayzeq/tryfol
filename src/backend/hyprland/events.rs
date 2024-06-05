@@ -1,4 +1,5 @@
 use super::{WindowAddress, Workspace};
+use crate::Split;
 use anyhow::{anyhow, Context};
 use async_stream::stream;
 use futures::Stream;
@@ -158,24 +159,19 @@ pub async fn events() -> anyhow::Result<impl Stream<Item = anyhow::Result<Event>
 
             match socket.try_read_buf(&mut data) {
                 Ok(_) => {
-                    let data_str = match std::str::from_utf8(&data) {
-                        Ok(x) => x,
-                        Err(e) => {
-                            data.clear();
-                            Err(e).context("Invalid utf8 received from Hyprland event socket")?
-                        }
-                    };
-                    let (messages, end) = data_str.rsplit_once('\n').unwrap_or(("", data_str));
+                    let (messages, end) = data.rsplit_once(b'\n').unwrap_or((b"", &data));
                     let end = end.to_owned();
 
                     if !messages.is_empty() {
-                        for message in messages.split('\n') {
-                            yield Event::from(message);
+                        for message in messages.split(|x| *x == b'\n') {
+                            yield Event::from(
+                                std::str::from_utf8(message)
+                                    .context("Invalid utf8 received from Hyprland event socket")?,
+                            );
                         }
                     }
 
-                    data.clear();
-                    data.extend_from_slice(end.as_bytes());
+                    data = end;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     continue;
