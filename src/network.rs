@@ -1,4 +1,4 @@
-use crate::{rfkill, widget_ext::HasTooltip};
+use crate::{rfkill, HasTooltip};
 use anyhow::Context;
 use futures::{future::Either, FutureExt, Stream, StreamExt, TryStream, TryStreamExt};
 use genetlink::GenetlinkHandle;

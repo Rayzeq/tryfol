@@ -1,4 +1,4 @@
-use crate::widget_ext::HasTooltip;
+use crate::HasTooltip;
 use futures::StreamExt;
 use gtk::{
     gdk,

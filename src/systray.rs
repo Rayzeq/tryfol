@@ -1,4 +1,4 @@
-use crate::{dbusmenu::DBusMenu, notifier_host, widget_ext::HasTooltip};
+use crate::{dbusmenu::DBusMenu, notifier_host, HasTooltip};
 use futures::StreamExt;
 use gtk::{
     gdk,

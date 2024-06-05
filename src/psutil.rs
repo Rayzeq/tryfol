@@ -1,4 +1,4 @@
-use crate::widget_ext::HasTooltip;
+use crate::HasTooltip;
 use gtk::{
     glib::{self, clone},
     prelude::*,

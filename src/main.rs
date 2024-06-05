@@ -17,6 +17,7 @@ mod bluetooth;
 mod brigthness;
 mod clock;
 mod dbusmenu;
+mod extensions;
 mod hyprland;
 mod modules;
 mod mpris;
@@ -27,7 +28,7 @@ mod psutil;
 mod rfkill;
 mod systray;
 mod things;
-mod widget_ext;
+pub use extensions::*;
 
 fn left_modules() -> gtk::Box {
     let hyprland::Modules { workspaces, window } = hyprland::new();

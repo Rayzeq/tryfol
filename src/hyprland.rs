@@ -1,6 +1,6 @@
 use crate::{
     backend::hyprland::{self, Workspace, WorkspaceId},
-    widget_ext::HasTooltip,
+    HasTooltip,
 };
 use futures::{pin_mut, StreamExt};
 use gtk::{
