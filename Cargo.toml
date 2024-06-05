@@ -6,7 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# notifier host
 log = "0.4"
 tokio = { version = "1.36.0", features = ["full"] }
 zbus = { version = "4.2.2", default-features = false, features = ["tokio"] }
@@ -35,3 +34,4 @@ genetlink = "0.2.5"
 anyhow = "1.0.86"
 thiserror = "1.0.61"
 async-stream = "0.3.5"
+pretty_env_logger = "0.5.0"
