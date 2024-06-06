@@ -1,17 +1,46 @@
 use gtk::{
     glib::{
+        self, clone,
         clone::{Downgrade, Upgrade},
         object::{Cast, IsA, ObjectExt},
         SignalHandlerId, WeakRef,
     },
     prelude::WidgetExt,
-    Tooltip, Widget,
+    EventControllerMotion, Tooltip, Widget,
 };
 use gtk4 as gtk;
+
+pub trait Hoverable {
+    fn connect_hover_notify<F>(&self, callback: F)
+    where
+        Self: Downgrade,
+        Self::Weak: Upgrade,
+        F: for<'a> Fn(&'a <Self::Weak as Upgrade>::Strong, bool) + 'static + Clone;
+}
 
 pub trait HasTooltip {
     fn set_better_tooltip(&self, tooltip: Option<String>);
     fn set_better_tooltip_markup(&self, tooltip: Option<String>);
+}
+
+impl<W> Hoverable for W
+where
+    W: WidgetExt + Downgrade,
+    W::Weak: Upgrade,
+{
+    fn connect_hover_notify<F>(&self, callback: F)
+    where
+        F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, bool) + 'static + Clone,
+    {
+        let motion_controller = EventControllerMotion::new();
+        motion_controller.connect_enter(
+            clone!(@weak self as this, @strong callback => move |_, _, _|  callback(&this, true)),
+        );
+        motion_controller.connect_leave(clone!(@weak self as this => move |_| {
+            callback(&this, false);
+        }));
+        self.add_controller(motion_controller);
+    }
 }
 
 impl<W> HasTooltip for W
