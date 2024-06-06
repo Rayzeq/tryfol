@@ -170,7 +170,7 @@ pkgs.mkShell {
 
   ];
   shellHook = ''
-    export LIBCLANG_PATH="/nix/store/0qdbw8n1q8ps04xij5hf3vcvf0mflh6d-clang-17.0.6-lib/lib"
+    export LIBCLANG_PATH="${pkgs.llvmPackages_17.libclang.lib}/lib"
     export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:${pkgs.wireplumber.dev}/lib/pkgconfig"
   '';
 }
