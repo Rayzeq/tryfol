@@ -1,3 +1,4 @@
+pub use super::raw::PlaybackStatus;
 use super::raw::PlayerProxy;
 use futures::StreamExt;
 use log::{error, warn};
@@ -5,11 +6,11 @@ use std::collections::HashMap;
 use zbus::{
     fdo::{PropertiesChangedArgs, PropertiesProxy},
     names::{InterfaceName, OwnedBusName},
-    zvariant::Value,
+    zvariant::{self, Value},
     Connection,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Player {
     proxy: PlayerProxy<'static>,
     properties: PropertiesProxy<'static>,
@@ -30,7 +31,35 @@ impl Player {
             .unwrap_or(destination)
     }
 
-    async fn toggle(&self) -> zbus::Result<()> {
+    pub async fn playback_status(&self) -> zbus::Result<PlaybackStatus> {
+        self.proxy.playback_status().await
+    }
+
+    pub async fn title(&self) -> zbus::Result<Option<String>> {
+        Ok(self
+            .proxy
+            .metadata()
+            .await?
+            .remove("xesam:title")
+            .map(TryInto::try_into)
+            .transpose()?)
+    }
+
+    pub async fn artists(&self) -> zbus::Result<Vec<String>> {
+        Ok(self
+            .proxy
+            .metadata()
+            .await?
+            .remove("xesam:artist")
+            .map(|artists| -> zvariant::Result<Vec<String>> { artists.try_into() })
+            .transpose()?
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|artist| !artist.is_empty())
+            .collect())
+    }
+
+    pub async fn toggle(&self) -> zbus::Result<()> {
         let can_control = self.proxy.can_control().await?;
         let can_play = self.proxy.can_play().await?;
         let can_pause = self.proxy.can_pause().await?;
@@ -45,7 +74,7 @@ impl Player {
         Ok(())
     }
 
-    async fn previous(&self) -> zbus::Result<()> {
+    pub async fn previous(&self) -> zbus::Result<()> {
         let can_control = self.proxy.can_control().await?;
         let can_go_previous = self.proxy.can_go_previous().await?;
 
@@ -59,7 +88,7 @@ impl Player {
         Ok(())
     }
 
-    async fn next(&self) -> zbus::Result<()> {
+    pub async fn next(&self) -> zbus::Result<()> {
         let can_control = self.proxy.can_control().await?;
         let can_go_next = self.proxy.can_go_next().await?;
 
