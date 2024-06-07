@@ -75,10 +75,10 @@ impl Player {
 
     pub fn connect_on_properties_changed<F>(&self, callback: F)
     where
-        F: Fn(InterfaceName, HashMap<&str, Value>, Vec<&str>) + Send + 'static,
+        F: Fn(InterfaceName, HashMap<&str, Value>, Vec<&str>) + 'static,
     {
         let proxy = self.properties.clone();
-        tokio::spawn(async move {
+        tokio::task::spawn_local(async move {
             let mut events = match proxy.receive_properties_changed().await {
                 Ok(x) => x,
                 Err(e) => {

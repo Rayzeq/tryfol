@@ -41,11 +41,11 @@ impl Mpris {
 
     pub fn connect_players_changed(
         &self,
-        added: impl Fn(Player) + Send + 'static,
-        removed: impl Fn(Player) + Send + 'static,
+        added: impl Fn(Player) + 'static,
+        removed: impl Fn(Player) + 'static,
     ) {
         let dbus = self.dbus.clone();
-        tokio::spawn(async move {
+        tokio::task::spawn_local(async move {
             let mut events = match dbus.receive_name_owner_changed().await {
                 Ok(x) => x,
                 Err(e) => {
