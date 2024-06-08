@@ -111,7 +111,7 @@ impl Player {
             let mut events = match proxy.receive_properties_changed().await {
                 Ok(x) => x,
                 Err(e) => {
-                    error!("Cannot receive events for properties changes: {e}");
+                    error!("Cannot receive events for properties changes: {e:?}");
                     return;
                 }
             };
@@ -120,7 +120,7 @@ impl Player {
                 let args = match event.args() {
                     Ok(x) => x,
                     Err(e) => {
-                        error!("Cannot parse dbus event args: {e}");
+                        error!("Cannot parse dbus event args: {e:?}");
                         return;
                     }
                 };

@@ -46,7 +46,7 @@ impl Modules {
 
         glib::spawn_future_local(async move {
             if let Err(e) = inner.run().await {
-                error!("Error in Hyprland module: {:?}", e);
+                error!("Error in Hyprland module: {e:?}");
             }
         });
 
@@ -104,7 +104,7 @@ impl ModulesInner {
         while let Some(event) = events.next().await {
             match event {
                 Ok(event) => self.handle_message(event).await,
-                Err(e) => error!("Error while reading Hyprland event: {:?}", e),
+                Err(e) => error!("Error while reading Hyprland event: {e:?}"),
             }
         }
 
@@ -139,7 +139,7 @@ impl ModulesInner {
                 /*|| (class == "sublime_text" && title.is_empty())*/
                 {
                     if let Err(e) = hyprland::close_window(address).await {
-                        error!("Failed to close window: {:?}", e);
+                        error!("Failed to close window: {e:?}");
                     }
                 }
             }
@@ -163,7 +163,7 @@ impl ModulesInner {
         button.connect_clicked(move |_| {
             glib::spawn_future_local(async move {
                 if let Err(e) = hyprland::change_workspace(id as WorkspaceId).await {
-                    error!("Failed to change workspace: {:?}", e);
+                    error!("Failed to change workspace: {e:?}");
                 }
             });
         });

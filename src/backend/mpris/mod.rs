@@ -49,7 +49,7 @@ impl Mpris {
             let mut events = match dbus.receive_name_owner_changed().await {
                 Ok(x) => x,
                 Err(e) => {
-                    error!("Cannot receive events for name owner change: {e}");
+                    error!("Cannot receive events for name owner change: {e:?}");
                     return;
                 }
             };
@@ -58,7 +58,7 @@ impl Mpris {
                 let args = match event.args() {
                     Ok(x) => x,
                     Err(e) => {
-                        error!("Cannot parse dbus event args: {e}");
+                        error!("Cannot parse dbus event args: {e:?}");
                         return;
                     }
                 };
