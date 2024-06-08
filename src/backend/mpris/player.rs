@@ -1,6 +1,7 @@
 pub use super::raw::PlaybackStatus;
 use super::raw::PlayerProxy;
 use futures::StreamExt;
+use gtk4::glib;
 use log::{error, warn};
 use std::collections::HashMap;
 use zbus::{
@@ -107,7 +108,7 @@ impl Player {
         F: Fn(InterfaceName, HashMap<&str, Value>, Vec<&str>) + 'static,
     {
         let proxy = self.properties.clone();
-        tokio::task::spawn_local(async move {
+        glib::spawn_future_local(async move {
             let mut events = match proxy.receive_properties_changed().await {
                 Ok(x) => x,
                 Err(e) => {

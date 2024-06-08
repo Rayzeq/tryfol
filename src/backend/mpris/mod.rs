@@ -1,4 +1,5 @@
 use futures::{future::join_all, StreamExt};
+use gtk4::glib;
 use log::error;
 use zbus::{
     fdo::{DBusProxy, NameOwnerChangedArgs},
@@ -45,7 +46,7 @@ impl Mpris {
         removed: impl Fn(Player) + 'static,
     ) {
         let dbus = self.dbus.clone();
-        tokio::task::spawn_local(async move {
+        glib::spawn_future_local(async move {
             let mut events = match dbus.receive_name_owner_changed().await {
                 Ok(x) => x,
                 Err(e) => {
