@@ -1,12 +1,10 @@
 // Since this contains all the spec, some things may not be used
 #![allow(dead_code)]
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use strum::EnumString;
 use zbus::{
     proxy,
-    zvariant::{self, ObjectPath, OwnedValue},
+    zvariant::{ObjectPath, OwnedValue, Structure},
 };
 
 /// An time in microseconds
@@ -14,22 +12,8 @@ pub type Time = i64;
 pub type TrackId<'a> = ObjectPath<'a>;
 
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    EnumString,
-    strum::Display,
-    Serialize,
-    Deserialize,
-    zvariant::Type,
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, strum::EnumString, strum::Display,
 )]
-#[serde(into = "String", try_from = "String")]
-#[zvariant(signature = "s")]
 pub enum PlaybackStatus {
     Playing,
     Paused,
@@ -37,22 +21,8 @@ pub enum PlaybackStatus {
 }
 
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    EnumString,
-    strum::Display,
-    Serialize,
-    Deserialize,
-    zvariant::Type,
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, strum::EnumString, strum::Display,
 )]
-#[serde(into = "String", try_from = "String")]
-#[zvariant(signature = "s")]
 pub enum LoopStatus {
     None,
     Track,
@@ -77,85 +47,85 @@ pub trait Player {
     #[zbus(signal)]
     fn seeked(&self, position: Time) -> fdo::Result<()>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn playback_status(&self) -> zbus::Result<PlaybackStatus>;
 
     // TODO: optional
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn loop_status(&self) -> zbus::Result<LoopStatus>;
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn set_loop_status(&self, value: LoopStatus) -> zbus::Result<()>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn rate(&self) -> zbus::Result<f64>;
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn set_rate(&self, value: f64) -> zbus::Result<()>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn minimum_rate(&self) -> zbus::Result<f64>;
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn maximum_rate(&self) -> zbus::Result<f64>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn shuffle(&self) -> zbus::Result<bool>;
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn set_shuffle(&self, value: bool) -> zbus::Result<()>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn metadata(&self) -> zbus::Result<HashMap<String, OwnedValue>>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn volume(&self) -> zbus::Result<f64>;
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn set_volume(&self, value: f64) -> zbus::Result<()>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn position(&self) -> zbus::Result<Time>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn can_go_next(&self) -> zbus::Result<bool>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn can_go_previous(&self) -> zbus::Result<bool>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn can_play(&self) -> zbus::Result<bool>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn can_pause(&self) -> zbus::Result<bool>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn can_seek(&self) -> zbus::Result<bool>;
 
-    #[dbus_proxy(property)]
+    #[zbus(property)]
     fn can_control(&self) -> zbus::Result<bool>;
 }
 
-impl From<PlaybackStatus> for String {
-    fn from(s: PlaybackStatus) -> Self {
-        s.to_string()
+impl TryFrom<OwnedValue> for PlaybackStatus {
+    type Error = zbus::zvariant::Error;
+
+    fn try_from(value: OwnedValue) -> Result<Self, Self::Error> {
+        let value: String = value.try_into()?;
+        value
+            .parse()
+            .map_err(|e: strum::ParseError| zbus::zvariant::Error::Message(e.to_string()))
     }
 }
 
-impl TryFrom<String> for PlaybackStatus {
-    type Error = <Self as std::str::FromStr>::Err;
+impl TryFrom<OwnedValue> for LoopStatus {
+    type Error = zbus::zvariant::Error;
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        value.parse()
+    fn try_from(value: OwnedValue) -> Result<Self, Self::Error> {
+        let value: String = value.try_into()?;
+        value
+            .parse()
+            .map_err(|e: strum::ParseError| zbus::zvariant::Error::Message(e.to_string()))
     }
 }
 
-impl From<LoopStatus> for String {
-    fn from(s: LoopStatus) -> Self {
-        s.to_string()
-    }
-}
-
-impl TryFrom<String> for LoopStatus {
-    type Error = <Self as std::str::FromStr>::Err;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        value.parse()
+impl From<LoopStatus> for Structure<'_> {
+    fn from(value: LoopStatus) -> Self {
+        Structure::from((value.to_string(),))
     }
 }
 
