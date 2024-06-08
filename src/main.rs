@@ -119,7 +119,7 @@ fn load_css(_: &Application) {
 
 fn main() -> glib::ExitCode {
     env::set_var("RUST_BACKTRACE", "1");
-    pretty_env_logger::init();
+    simple_logger::init_with_level(log::Level::Warn).unwrap();
 
     let app = Application::builder()
         .application_id("me.rayzeq.Tryfol")
