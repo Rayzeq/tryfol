@@ -19,7 +19,6 @@ mod clock;
 mod dbusmenu;
 mod extensions;
 mod modules;
-mod mpris;
 mod network;
 mod notifier_host;
 mod power;
