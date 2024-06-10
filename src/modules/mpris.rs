@@ -34,16 +34,16 @@ pub fn new() -> gtk::Box {
         .child(&next)
         .build();
 
-    let container = gtk::Box::builder()
+    let root = gtk::Box::builder()
         .name("mpris")
         .css_classes(["module"])
         .visible(false)
         .build();
-    container.append(&left_revealer);
-    container.append(&play_pause);
-    container.append(&right_revealer);
+    root.append(&left_revealer);
+    root.append(&play_pause);
+    root.append(&right_revealer);
 
-    container.connect_hover_notify(move |_, hovered| {
+    root.connect_hover_notify(move |_, hovered| {
         left_revealer.set_reveal_child(hovered);
         right_revealer.set_reveal_child(hovered);
     });
@@ -80,17 +80,17 @@ pub fn new() -> gtk::Box {
         }));
     }));
 
-    glib::spawn_future_local(clone!(@weak container => async move {
-        if let Err(e) = listen(container, label, current_player).await {
+    glib::spawn_future_local(clone!(@weak root => async move {
+        if let Err(e) = listen(root, label, current_player).await {
             error!("Cannot listen for Mpris players: {e:?}");
         }
     }));
 
-    container
+    root
 }
 
 async fn listen(
-    container: gtk::Box,
+    root: gtk::Box,
     label: Label,
     current_player: Rc<Mutex<Option<Player>>>,
 ) -> anyhow::Result<()> {
@@ -100,12 +100,7 @@ async fn listen(
 
     let mut players = HashMap::new();
     for player in mpris.players().await.context("While getting players")? {
-        manage_player(
-            &player,
-            current_player.clone(),
-            container.clone(),
-            label.clone(),
-        );
+        manage_player(&player, current_player.clone(), root.clone(), label.clone());
         players.insert(player.app_name().to_owned(), player);
     }
 
@@ -113,7 +108,7 @@ async fn listen(
         .await
         .context("While finding suitable player")?
     {
-        container.set_visible(true);
+        root.set_visible(true);
         current_player.lock().await.replace(player.clone());
         update_label(&player, &label)
             .await
@@ -122,16 +117,16 @@ async fn listen(
     let players = Rc::new(Mutex::new(players));
 
     mpris.connect_players_changed(
-        clone!(@weak container, @weak label, @strong players, @strong current_player => move |player| {
+        clone!(@weak root, @weak label, @strong players, @strong current_player => move |player| {
             glib::spawn_future_local(
-                clone!(@weak container, @weak label, @strong players, @strong current_player => async move {
-                    handle_new_player(player, &mut *players.lock().await, current_player, container, label);
+                clone!(@weak root, @weak label, @strong players, @strong current_player => async move {
+                    handle_new_player(player, &mut *players.lock().await, current_player, root, label);
                 }),
             );
         }),
         move |player| {
-            glib::spawn_future_local(clone!(@weak container, @weak label, @strong players, @strong current_player => async move {
-                if let Err(e) = handle_removed_player(player, &mut *players.lock().await, current_player, container, label).await {
+            glib::spawn_future_local(clone!(@weak root, @weak label, @strong players, @strong current_player => async move {
+                if let Err(e) = handle_removed_player(player, &mut *players.lock().await, current_player, root, label).await {
                     error!("Cannot handle removed Mpris player: {e:?}");
                 }
             }));
@@ -148,10 +143,10 @@ fn handle_new_player(
     player: Player,
     players: &mut HashMap<String, Player>,
     current_player: Rc<Mutex<Option<Player>>>,
-    container: gtk::Box,
+    root: gtk::Box,
     label: Label,
 ) {
-    manage_player(&player, current_player, container, label);
+    manage_player(&player, current_player, root, label);
     players.insert(player.app_name().to_owned(), player);
 }
 
@@ -159,7 +154,7 @@ async fn handle_removed_player(
     player: Player,
     players: &mut HashMap<String, Player>,
     current_player: Rc<Mutex<Option<Player>>>,
-    container: gtk::Box,
+    root: gtk::Box,
     label: Label,
 ) -> anyhow::Result<()> {
     players.remove(&player.app_name().to_owned());
@@ -174,13 +169,13 @@ async fn handle_removed_player(
             .await
             .context("While finding suitable player")?
         {
-            container.set_visible(true);
+            root.set_visible(true);
             current_player.lock().await.replace(player.clone());
             update_label(&player, &label)
                 .await
                 .context("While updating label")?;
         } else {
-            container.set_visible(false);
+            root.set_visible(false);
             current_player.lock().await.take();
         };
     }
@@ -201,12 +196,12 @@ async fn find_suitable_player(players: &HashMap<String, Player>) -> anyhow::Resu
 fn manage_player(
     player: &Player,
     current_player: Rc<Mutex<Option<Player>>>,
-    container: gtk::Box,
+    root: gtk::Box,
     label: Label,
 ) {
     player
         .connect_on_properties_changed(clone!(@strong player => move |_, _, _| {
-            glib::spawn_future_local(clone!(@strong player, @strong current_player, @weak container, @weak label  => async move {
+            glib::spawn_future_local(clone!(@strong player, @strong current_player, @weak root, @weak label  => async move {
                 if  current_player.lock().await.as_ref().is_some_and(|current| *current == player) {
                     if let Err(e) = update_label(&player, &label).await {
                         error!("Cannot update Mpris label: {e:?}");
@@ -225,7 +220,7 @@ fn manage_player(
                         error!("Cannot update Mpris label: {e:?}");
                     }
                     current_player.lock().await.replace(player);
-                    container.set_visible(true);
+                    root.set_visible(true);
                 }
             }));
         }));
