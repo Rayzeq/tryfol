@@ -1,6 +1,6 @@
 use crate::{
     backend::hyprland::{self, Workspace, WorkspaceId, WorkspaceInfos},
-    HasTooltip, NumberExt,
+    HasTooltip, Japanese,
 };
 use futures::{pin_mut, StreamExt};
 use gtk::{glib, pango::EllipsizeMode, prelude::*, Button, Label};
