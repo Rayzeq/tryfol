@@ -32,7 +32,7 @@ impl Player {
             .unwrap_or(destination)
     }
 
-    pub async fn playback_status(&self) -> zbus::Result<PlaybackStatus> {
+    pub async fn playback_status(&self) -> zbus::fdo::Result<PlaybackStatus> {
         self.proxy.playback_status().await
     }
 
@@ -60,7 +60,7 @@ impl Player {
             .collect())
     }
 
-    pub async fn toggle(&self) -> zbus::Result<()> {
+    pub async fn toggle(&self) -> zbus::fdo::Result<()> {
         let can_control = self.proxy.can_control().await?;
         let can_play = self.proxy.can_play().await?;
         let can_pause = self.proxy.can_pause().await?;
@@ -75,7 +75,7 @@ impl Player {
         Ok(())
     }
 
-    pub async fn previous(&self) -> zbus::Result<()> {
+    pub async fn previous(&self) -> zbus::fdo::Result<()> {
         let can_control = self.proxy.can_control().await?;
         let can_go_previous = self.proxy.can_go_previous().await?;
 
@@ -89,7 +89,7 @@ impl Player {
         Ok(())
     }
 
-    pub async fn next(&self) -> zbus::Result<()> {
+    pub async fn next(&self) -> zbus::fdo::Result<()> {
         let can_control = self.proxy.can_control().await?;
         let can_go_next = self.proxy.can_go_next().await?;
 

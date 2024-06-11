@@ -3,6 +3,7 @@ use crate::{
     Hoverable,
 };
 use anyhow::Context;
+use async_recursion::async_recursion;
 use gtk::{
     glib::{self, clone},
     pango::EllipsizeMode,
@@ -98,13 +99,24 @@ async fn listen(
         .await
         .context("While creating Mpris connection")?;
 
-    let mut players = HashMap::new();
+    let players = Rc::new(Mutex::new(HashMap::new()));
+
     for player in mpris.players().await.context("While getting players")? {
-        manage_player(&player, current_player.clone(), root.clone(), label.clone());
-        players.insert(player.app_name().to_owned(), player);
+        manage_player(
+            &player,
+            &players,
+            current_player.clone(),
+            root.clone(),
+            label.clone(),
+        );
+        players
+            .lock()
+            .await
+            .insert(player.app_name().to_owned(), player);
     }
 
-    if let Some(player) = find_suitable_player(&players)
+    // TODO: a player might disappear and cause an error here
+    if let Some(player) = find_suitable_player(&mut *players.lock().await)
         .await
         .context("While finding suitable player")?
     {
@@ -114,19 +126,18 @@ async fn listen(
             .await
             .context("While updating label")?;
     }
-    let players = Rc::new(Mutex::new(players));
 
     mpris.connect_players_changed(
         clone!(@weak root, @weak label, @strong players, @strong current_player => move |player| {
             glib::spawn_future_local(
                 clone!(@weak root, @weak label, @strong players, @strong current_player => async move {
-                    handle_new_player(player, &mut *players.lock().await, current_player, root, label);
+                    handle_new_player(player, players, current_player, root, label).await;
                 }),
             );
         }),
         move |player| {
             glib::spawn_future_local(clone!(@weak root, @weak label, @strong players, @strong current_player => async move {
-                if let Err(e) = handle_removed_player(player, &mut *players.lock().await, current_player, root, label).await {
+                if let Err(e) = handle_removed_player(player, &mut *players.lock().await, current_player, &root, &label).await {
                     error!("Cannot handle removed Mpris player: {e:?}");
                 }
             }));
@@ -139,23 +150,27 @@ async fn listen(
     Ok(())
 }
 
-fn handle_new_player(
+async fn handle_new_player(
     player: Player,
-    players: &mut HashMap<String, Player>,
+    players: Rc<Mutex<HashMap<String, Player>>>,
     current_player: Rc<Mutex<Option<Player>>>,
     root: gtk::Box,
     label: Label,
 ) {
-    manage_player(&player, current_player, root, label);
-    players.insert(player.app_name().to_owned(), player);
+    manage_player(&player, &players, current_player, root, label);
+    players
+        .lock()
+        .await
+        .insert(player.app_name().to_owned(), player);
 }
 
+#[async_recursion(?Send)]
 async fn handle_removed_player(
     player: Player,
     players: &mut HashMap<String, Player>,
     current_player: Rc<Mutex<Option<Player>>>,
-    root: gtk::Box,
-    label: Label,
+    root: &gtk::Box,
+    label: &Label,
 ) -> anyhow::Result<()> {
     players.remove(&player.app_name().to_owned());
 
@@ -169,11 +184,19 @@ async fn handle_removed_player(
             .await
             .context("While finding suitable player")?
         {
+            let result = update_label(&player, label).await;
+            match result {
+                Ok(()) => (),
+                Err(zbus::fdo::Error::ServiceUnknown(_)) => {
+                    return handle_removed_player(player, players, current_player, root, label)
+                        .await;
+                }
+                Err(e) => {
+                    error!("Cannot handle Mpris player update: {e:?}");
+                }
+            }
             root.set_visible(true);
-            current_player.lock().await.replace(player.clone());
-            update_label(&player, &label)
-                .await
-                .context("While updating label")?;
+            current_player.lock().await.replace(player);
         } else {
             root.set_visible(false);
             current_player.lock().await.take();
@@ -183,11 +206,22 @@ async fn handle_removed_player(
     Ok(())
 }
 
-async fn find_suitable_player(players: &HashMap<String, Player>) -> anyhow::Result<Option<Player>> {
-    for player in players.values() {
-        if player.playback_status().await? == PlaybackStatus::Playing {
-            return Ok(Some(player.clone()));
+async fn find_suitable_player(
+    players: &mut HashMap<String, Player>,
+) -> zbus::fdo::Result<Option<Player>> {
+    let mut zombie_players = Vec::new();
+
+    for (name, player) in players.iter_mut() {
+        match player.playback_status().await {
+            Ok(PlaybackStatus::Playing) => return Ok(Some(player.clone())),
+            Ok(_) => (),
+            Err(zbus::fdo::Error::ServiceUnknown(_)) => zombie_players.push(name.clone()),
+            Err(e) => return Err(e),
         }
+    }
+
+    for name in zombie_players {
+        players.remove(&name);
     }
 
     Ok(players.values().next().cloned())
@@ -195,38 +229,55 @@ async fn find_suitable_player(players: &HashMap<String, Player>) -> anyhow::Resu
 
 fn manage_player(
     player: &Player,
+    players: &Rc<Mutex<HashMap<String, Player>>>,
     current_player: Rc<Mutex<Option<Player>>>,
     root: gtk::Box,
     label: Label,
 ) {
     player
-        .connect_on_properties_changed(clone!(@strong player => move |_, _, _| {
-            glib::spawn_future_local(clone!(@strong player, @strong current_player, @weak root, @weak label  => async move {
-                if  current_player.lock().await.as_ref().is_some_and(|current| *current == player) {
-                    if let Err(e) = update_label(&player, &label).await {
-                        error!("Cannot update Mpris label: {e:?}");
+        .connect_on_properties_changed(clone!(@strong player, @strong players => move |_, _, _| {
+            glib::spawn_future_local(clone!(@strong player, @strong players, @strong current_player, @weak root, @weak label => async move {
+                let result = handle_player_update(player.clone(), &mut *current_player.lock().await, &root, &label).await;
+                match result {
+                    Ok(()) => (),
+                    Err(zbus::fdo::Error::ServiceUnknown(_)) => {
+                        if let Err(e) = handle_removed_player(player, &mut *players.lock().await, current_player, &root, &label).await {
+                            error!("Cannot find new Mpris player: {e:?}");
+                        }
                     }
-                }
-
-                let status = match player.playback_status().await {
-                    Ok(x) => x,
                     Err(e) => {
-                        error!("Cannot get playback status: {e:?}");
-                        return;
-                    },
-                };
-                if status == PlaybackStatus::Playing {
-                    if let Err(e) = update_label(&player, &label).await {
-                        error!("Cannot update Mpris label: {e:?}");
+                        error!("Cannot handle Mpris player update: {e:?}");
                     }
-                    current_player.lock().await.replace(player);
-                    root.set_visible(true);
                 }
             }));
         }));
 }
 
-async fn update_label(player: &Player, label: &Label) -> anyhow::Result<()> {
+async fn handle_player_update(
+    player: Player,
+    current_player: &mut Option<Player>,
+    root: &gtk::Box,
+    label: &Label,
+) -> zbus::fdo::Result<()> {
+    if current_player
+        .as_ref()
+        .is_some_and(|current| *current == player)
+    {
+        update_label(&player, label).await?;
+        return Ok(());
+    }
+
+    let status = player.playback_status().await?;
+    if status == PlaybackStatus::Playing {
+        update_label(&player, label).await?;
+        current_player.replace(player);
+        root.set_visible(true);
+    }
+
+    Ok(())
+}
+
+async fn update_label(player: &Player, label: &Label) -> zbus::fdo::Result<()> {
     let status = player.playback_status().await?;
     let mut text = if status == PlaybackStatus::Playing {
         "󰏤  "
