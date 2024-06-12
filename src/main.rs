@@ -15,7 +15,6 @@ mod backend;
 mod battery;
 mod bluetooth;
 mod brigthness;
-mod clock;
 mod dbusmenu;
 mod extensions;
 mod modules;
@@ -121,10 +120,6 @@ fn main() -> glib::ExitCode {
     let app = Application::builder()
         .application_id("me.rayzeq.Tryfol")
         .build();
-
-    glib::spawn_future_local(async {
-        backend::test().await;
-    });
 
     app.connect_startup(load_css);
     app.connect_activate(create_window);
