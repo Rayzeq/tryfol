@@ -22,7 +22,6 @@ mod modules;
 mod network;
 mod notifier_host;
 mod power;
-mod psutil;
 mod rfkill;
 mod systray;
 mod things;
@@ -47,7 +46,7 @@ fn right_modules() -> gtk::Box {
         cpu,
         memory,
         temperatures,
-    } = psutil::new();
+    } = psutil::Modules::new();
 
     let battery_module = gtk::Box::new(Orientation::Horizontal, 0);
     battery_module.set_widget_name("battery");
