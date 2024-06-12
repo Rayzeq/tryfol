@@ -61,10 +61,14 @@ where
 }
 
 // unsafe because I use a lot widget.data and widget.set_data
-unsafe fn set_tooltip_full<W>(widget: &W, tooltip_text: Option<String>, is_markup: bool)
+unsafe fn set_tooltip_full<W>(widget: &W, mut tooltip_text: Option<String>, is_markup: bool)
 where
     W: ObjectExt + WidgetExt + Downgrade,
 {
+    if matches!(tooltip_text.as_deref(), Some("")) {
+        tooltip_text = None;
+    }
+
     widget.set_has_tooltip(tooltip_text.is_some());
     if let Some(tooltip_text) = tooltip_text {
         // if there is already a tooltip, update it
