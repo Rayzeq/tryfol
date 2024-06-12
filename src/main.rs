@@ -21,7 +21,6 @@ mod extensions;
 mod modules;
 mod network;
 mod notifier_host;
-mod power;
 mod rfkill;
 mod systray;
 mod things;
@@ -68,7 +67,7 @@ fn right_modules() -> gtk::Box {
     modules.append(&cpu);
     modules.append(&battery_module);
     modules.append(&audio::new());
-    modules.append(&power::new());
+    modules.append(&powerbutton::new());
 
     modules
 }
