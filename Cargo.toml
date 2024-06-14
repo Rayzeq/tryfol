@@ -16,7 +16,6 @@ gtk4-layer-shell = "0.3.0"
 html-escape = "0.2.13"
 lazy_static = "1.4.0"
 libc = "0.2.153"
-psutil = { version = "3.3.0", default-features = false, features = ["cpu", "memory", "sensors"], path = "../../Forks/rust-psutil" }
 regex = "1.10.4"
 serde = { version = "1.0.201", features = ["derive"] }
 serde_json = "1.0.117"
@@ -37,3 +36,10 @@ async-stream = "0.3.5"
 strum = { version = "0.26.2", features = ["derive"] }
 simple_logger = { version = "5.0.0", default-features = false, features = ["colors", "stderr"] }
 async-recursion = "1.1.1"
+
+[dependencies.psutil]
+git = "https://github.com/Rayzeq/rust-psutil.git"
+branch = "cpu-freq"
+
+default-features = false
+features = ["cpu", "memory", "sensors"]

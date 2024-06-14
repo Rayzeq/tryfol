@@ -1798,6 +1798,7 @@ dependencies = [
 [[package]]
 name = "psutil"
 version = "3.3.0"
+source = "git+https://github.com/Rayzeq/rust-psutil.git?branch=cpu-freq#f0742ba4ef3a946afcec773beb3e3c213e31b868"
 dependencies = [
  "cfg-if",
  "glob",
