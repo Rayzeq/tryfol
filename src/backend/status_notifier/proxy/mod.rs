@@ -1,5 +1,5 @@
 mod item;
 mod watcher;
 
-pub use item::{Category, Orientation, Pixmap, Status, StatusNotifierItemProxy};
-pub use watcher::StatusNotifierWatcherProxy;
+pub use item::{Category, ItemProxy, Orientation, Pixmap, Status};
+pub use watcher::WatcherProxy;

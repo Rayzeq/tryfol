@@ -5,7 +5,7 @@ use zbus::{names::BusName, proxy};
     interface = "org.kde.StatusNotifierWatcher",
     default_path = "/StatusNotifierWatcher"
 )]
-trait StatusNotifierWatcher {
+trait Watcher {
     /// Register a StatusNotifierHost into the StatusNotifierWatcher, in the form of its full name on the session bus,
     /// for instance org.freedesktop.StatusNotifierHost-4005.
     /// Every NotficationHost instance that intends to display StatusNotifierItem representations

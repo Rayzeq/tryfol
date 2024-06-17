@@ -1,6 +1,4 @@
-use crate::{
-    backend::status_notifier::StatusNotifierWatcher, dbusmenu::DBusMenu, notifier_host, HasTooltip,
-};
+use crate::{backend::status_notifier::Watcher, dbusmenu::DBusMenu, notifier_host, HasTooltip};
 use futures::StreamExt;
 use gtk::{
     gdk,
@@ -37,7 +35,7 @@ async fn dbus_session() -> zbus::Result<&'static DBusSession> {
     DBUS_STATE
         .get_or_try_init(|| async {
             let con = zbus::Connection::session().await?;
-            StatusNotifierWatcher::get_or_start(&con).await?;
+            Watcher::get_or_start(&con).await?;
 
             let (_, snw) = notifier_host::register_as_host(&con).await?;
 

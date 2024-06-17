@@ -1,4 +1,4 @@
-use super::proxy::{StatusNotifierItemProxy, StatusNotifierWatcherProxy};
+use super::proxy::{ItemProxy, WatcherProxy};
 use futures::StreamExt;
 use log::error;
 use std::{collections::HashSet, sync::Arc};
@@ -15,18 +15,16 @@ use zbus::{
 
 #[derive(Debug, Clone, Default)]
 #[allow(clippy::module_name_repetitions)]
-pub struct StatusNotifierWatcher {
+pub struct Watcher {
     hosts: Arc<Mutex<HashSet<String>>>,
     items: Arc<Mutex<HashSet<String>>>,
 }
 
-impl StatusNotifierWatcher {
+impl Watcher {
     const PATH: &'static str = "/StatusNotifierWatcher";
     const WELL_KNOWN_NAME: &'static str = "org.kde.StatusNotifierWatcher";
 
-    pub async fn get_or_start(
-        connection: &Connection,
-    ) -> zbus::Result<StatusNotifierWatcherProxy<'static>> {
+    pub async fn get_or_start(connection: &Connection) -> zbus::Result<WatcherProxy<'static>> {
         let this = Self::default();
         if !connection.object_server().at(Self::PATH, this).await? {
             error!("A StatusNotifierWatcher object is already running on this connection");
@@ -44,7 +42,7 @@ impl StatusNotifierWatcher {
                 RequestNameReply::AlreadyOwner
                 | RequestNameReply::PrimaryOwner
                 | RequestNameReply::Exists,
-            ) => Ok(StatusNotifierWatcherProxy::new(connection).await?),
+            ) => Ok(WatcherProxy::new(connection).await?),
             Ok(RequestNameReply::InQueue) => unreachable!(),
             Err(e) => Err(e),
         }
@@ -56,10 +54,7 @@ impl StatusNotifierWatcher {
     ) -> zbus::Result<(OwnedBusName, OwnedObjectPath)> {
         // see https://github.com/KDE/plasma-workspace/blob/master/statusnotifierwatcher/statusnotifierwatcher.cpp
         if let Ok(bus_name) = service.try_into() {
-            return Ok((
-                bus_name,
-                OwnedObjectPath::try_from(StatusNotifierItemProxy::PATH)?,
-            ));
+            return Ok((bus_name, OwnedObjectPath::try_from(ItemProxy::PATH)?));
         }
         if let (Some(sender), Ok(path)) = (header.sender(), service.try_into()) {
             return Ok((BusName::Unique(sender.to_owned()).into(), path));
@@ -100,7 +95,7 @@ impl StatusNotifierWatcher {
 #[interface(name = "org.kde.StatusNotifierWatcher")]
 // the macro does not use Self
 #[allow(clippy::use_self)]
-impl StatusNotifierWatcher {
+impl Watcher {
     async fn register_status_notifier_host(
         &self,
         service: &str,
