@@ -35,12 +35,6 @@ pub mod proxy;
 mod host;
 pub use host::*;
 
-mod icon;
-pub use icon::*;
-
-mod item;
-pub use item::*;
-
 pub(crate) mod names {
     pub const ITEM_OBJECT: &str = "/StatusNotifierItem";
 }

@@ -9,8 +9,5 @@
 //! For more information, see ["Writing a client proxy" in the zbus
 //! tutorial](https://dbus2.github.io/zbus/).
 
-mod dbus_status_notifier_item;
-pub use dbus_status_notifier_item::*;
-
 mod dbus_status_notifier_watcher;
 pub use dbus_status_notifier_watcher::*;

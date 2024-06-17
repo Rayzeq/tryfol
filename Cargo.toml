@@ -36,6 +36,7 @@ async-stream = "0.3.5"
 strum = { version = "0.26.2", features = ["derive"] }
 simple_logger = { version = "5.0.0", default-features = false, features = ["colors", "stderr"] }
 async-recursion = "1.1.1"
+paste = "1.0.15"
 
 [dependencies.psutil]
 git = "https://github.com/Rayzeq/rust-psutil.git"

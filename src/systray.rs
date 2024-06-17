@@ -1,5 +1,8 @@
-use crate::{backend::status_notifier::Watcher, dbusmenu::DBusMenu, notifier_host, HasTooltip};
-use futures::StreamExt;
+use crate::{
+    backend::status_notifier::{self, Watcher},
+    dbusmenu::DBusMenu,
+    notifier_host, HasTooltip,
+};
 use gtk::{
     gdk,
     glib::{self, clone},
@@ -82,14 +85,14 @@ pub fn spawn_systray(container: &gtk::Box, props: &Props) {
         let s = match dbus_session().await {
             Ok(x) => x,
             Err(e) => {
-                log::error!("could not initialise dbus connection for tray: {}", e);
+                log::error!("could not initialise dbus connection for tray: {e:?}");
                 return;
             }
         };
 
         systray.container.set_visible(true);
         let e = notifier_host::run_host(&mut systray, &s.snw).await;
-        log::error!("notifier host error: {}", e);
+        log::error!("notifier host error: {:?}", e);
     });
 
     // stop the task when the widget is dropped
@@ -99,7 +102,7 @@ pub fn spawn_systray(container: &gtk::Box, props: &Props) {
 }
 
 impl notifier_host::Host for Tray {
-    fn add_item(&mut self, id: &str, item: notifier_host::Item) {
+    fn add_item(&mut self, id: &str, item: status_notifier::Item) {
         let item = Item::new(id.to_owned(), item);
         if *self.prepend_new.borrow() {
             self.container.append(&item.widget);
@@ -141,7 +144,7 @@ impl Drop for Item {
 impl Item {
     const ICON_SIZE: i32 = 18;
 
-    fn new(id: String, item: notifier_host::Item) -> Self {
+    fn new(id: String, item: status_notifier::Item) -> Self {
         let gtk_widget = gtk::Box::new(Orientation::Horizontal, 0);
 
         // Support :hover selector (is this still necessary ?)
@@ -160,7 +163,7 @@ impl Item {
 
         let task = glib::MainContext::default().spawn_local(async move {
             if let Err(e) = Self::maintain(gtk_widget.clone(), item).await {
-                log::error!("error for systray item {}: {}", id, e);
+                log::error!("error for systray item {}: {:?}", id, e);
             }
         });
 
@@ -170,29 +173,33 @@ impl Item {
         }
     }
 
-    async fn maintain(widget: gtk::Box, mut item: notifier_host::Item) -> zbus::Result<()> {
+    async fn maintain(widget: gtk::Box, mut item: status_notifier::Item) -> zbus::Result<()> {
         // init icon
         let icon = gtk::Image::new();
         widget.append(&icon);
 
         // init menu
-        if let Err(e) = item.set_menu(&widget).await {
-            log::warn!("failed to set menu: {}", e);
-        }
+        let menu_real = Rc::new(RefCell::new(if let Ok(menu_path) = item.menu().await {
+            let menu = DBusMenu::new(item.destination(), &menu_path);
+            menu.set_parent(&widget);
+            Some(menu)
+        } else {
+            None
+        }));
 
         // TODO this is a lot of code duplication unfortunately, i'm not really sure how to
         // refactor without making the borrow checker angry
 
         // set status
         match item.status().await? {
-            notifier_host::Status::Passive => widget.set_visible(false),
-            notifier_host::Status::Active | notifier_host::Status::NeedsAttention => {
+            status_notifier::Status::Passive => widget.set_visible(false),
+            status_notifier::Status::Active | status_notifier::Status::NeedsAttention => {
                 widget.set_visible(true);
             }
         }
 
         // set title
-        widget.set_better_tooltip(Some(item.sni.title().await?));
+        widget.set_better_tooltip(Some(item.title().await?));
 
         // set icon
         let scale = icon.scale_factor();
@@ -201,13 +208,14 @@ impl Item {
         let item_real = Rc::new(item);
 
         let item = item_real.clone();
+        let menu = Rc::clone(&menu_real);
         let gesture = gtk::GestureClick::new();
         gesture.set_button(gdk::BUTTON_PRIMARY);
         gesture.connect_pressed(move |gesture, _, x, y| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
 
             let (x, y) = (x as i32, y as i32);
-            let item_is_menu = run_async_task(async { item.sni.item_is_menu().await });
+            let item_is_menu = run_async_task(async { item.item_is_menu().await });
             let have_item_is_menu = item_is_menu.is_ok();
             let item_is_menu = item_is_menu.unwrap_or(false);
             log::debug!(
@@ -218,21 +226,21 @@ impl Item {
                 item_is_menu
             );
             let result = if !item_is_menu {
-                let result = run_async_task(async { item.sni.activate(x, y).await });
+                let result = run_async_task(async { item.activate(x, y).await });
                 if result.is_err() && !have_item_is_menu {
                     log::debug!("fallback to context menu due to: {}", result.unwrap_err());
                     // Some applications are in fact menu-only (don't have Activate method)
                     // but don't report so through ItemIsMenu property. Fallback to menu if
                     // activate failed in this case.
-                    run_async_task(async { item.popup_menu(x, y).await })
+                    run_async_task(async { Self::popup_menu(&item, &menu, x, y).await })
                 } else {
-                    result
+                    result.map_err(Into::into)
                 }
             } else {
-                run_async_task(async { item.popup_menu(x, y).await })
+                run_async_task(async { Self::popup_menu(&item, &menu, x, y).await })
             };
             if let Err(result) = result {
-                log::error!("failed to handle primary mouse click: {}", result);
+                log::error!("failed to handle primary mouse click: {:?}", result);
             }
         });
         widget.add_controller(gesture);
@@ -246,52 +254,60 @@ impl Item {
             let (x, y) = (x as i32, y as i32);
             log::debug!("mouse click button=middle, x={}, y={}", x, y,);
 
-            if let Err(result) = run_async_task(async { item.sni.secondary_activate(x, y).await }) {
-                log::error!("failed to handle middle mouse click: {}", result);
+            if let Err(result) = run_async_task(async { item.secondary_activate(x, y).await }) {
+                log::error!("failed to handle middle mouse click: {:?}", result);
             }
         });
         widget.add_controller(gesture);
 
-        let item = item_real.clone();
+        let item = item_real;
         let gesture = gtk::GestureClick::new();
         gesture.set_button(gdk::BUTTON_SECONDARY);
         gesture.connect_pressed(clone!(@strong item => move |gesture, _, x, y| {
             gesture.set_state(gtk::EventSequenceState::Claimed);
-            run_async_task(async { item.popup_menu(x as i32, y as i32).await }).unwrap();
+            run_async_task(async { Self::popup_menu(&item, &menu_real, x as i32, y as i32).await }).unwrap();
         }));
         widget.add_controller(gesture);
 
-        // updates
-        let mut status_updates = item.sni.receive_new_status().await?;
-        let mut title_updates = item.sni.receive_new_title().await?;
-        let mut icon_updates = item.sni.receive_new_icon().await?;
-
-        loop {
-            tokio::select! {
-                Some(_) = status_updates.next() => {
-                    // set status
-                    match item.status().await? {
-                        notifier_host::Status::Passive => widget.set_visible(false),
-                        notifier_host::Status::Active | notifier_host::Status::NeedsAttention => widget.set_visible(true),
-                    }
-                }
-                Some(_) = title_updates.next() => {
-                    // set title
-                    widget.set_better_tooltip(Some(item.sni.title().await?));
-                }
-                Some(_) = icon_updates.next() => {
-                    // set icon
-                    load_icon_for_item(&icon, &item, Self::ICON_SIZE, scale).await;
-                }
+        item.connect_status_changed(clone!(@weak widget => move |new_status| match new_status {
+            status_notifier::Status::Passive => widget.set_visible(false),
+            status_notifier::Status::Active | status_notifier::Status::NeedsAttention => {
+                widget.set_visible(true)
             }
+        }));
+        item.connect_title_changed(
+            clone!(@weak widget => move |new_title| widget.set_better_tooltip(Some(new_title))),
+        );
+        item.connect_icon_changed(
+            Self::ICON_SIZE,
+            scale,
+            clone!(@weak widget => move |new_icon| {
+                icon.set_paintable(Some(&new_icon));
+            }),
+        );
+
+        Ok(())
+    }
+
+    async fn popup_menu(
+        item: &status_notifier::Item,
+        menu: &Rc<RefCell<Option<DBusMenu>>>,
+        x: i32,
+        y: i32,
+    ) -> zbus::Result<()> {
+        if let Some(menu) = &*menu.borrow() {
+            menu.popup();
+            Ok(())
+        } else {
+            item.context_menu(x, y).await.map_err(Into::into)
         }
     }
 }
 
-async fn load_icon_for_item(icon: &Image, item: &notifier_host::Item, size: i32, scale: i32) {
+async fn load_icon_for_item(icon: &Image, item: &status_notifier::Item, size: i32, scale: i32) {
     icon.set_pixel_size(size);
     icon.set_icon_name(None);
-    if let Some(pixbuf) = item.icon(icon, size, scale).await {
+    if let Ok(pixbuf) = item.icon(size, scale).await {
         icon.set_paintable(Some(&pixbuf));
     }
 }

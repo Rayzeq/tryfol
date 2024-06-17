@@ -1,3 +1,5 @@
+use crate::backend::status_notifier::Item;
+
 use super::*;
 
 use zbus::export::ordered_stream::{self, OrderedStreamExt};
@@ -101,7 +103,7 @@ pub async fn run_host(
 
     // initial items first
     for svc in try_!(snw.registered_status_notifier_items().await) {
-        match Item::from_address(snw.inner().connection(), &svc).await {
+        match Item::from_id(snw.inner().connection(), &svc).await {
             Ok(item) => {
                 item_names.insert(svc.to_owned());
                 host.add_item(&svc, item);
@@ -127,7 +129,7 @@ pub async fn run_host(
                 if item_names.contains(svc) {
                     log::info!("Got duplicate new item: {:?}", svc);
                 } else {
-                    match Item::from_address(snw.inner().connection(), svc).await {
+                    match Item::from_id(snw.inner().connection(), svc).await {
                         Ok(item) => {
                             item_names.insert(svc.to_owned());
                             host.add_item(svc, item);
