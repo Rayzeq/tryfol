@@ -15,11 +15,11 @@ lazy_static! {
     // we unwrap here because Regex::new will only panic if the pattern is invalid
     static ref REWRITES: [(Regex, &'static str); 6] = [
         // this will apply to youtube inside firefox
-        (Regex::new(r"(.*) - YouTube").unwrap(), "󰗃  $1"),
+        (Regex::new(r"(.*) - YouTube").unwrap(), "<span foreground=\"#ff0000\">󰗃</span>  $1"),
         (Regex::new(r"(.*) — Mozilla Firefox Private Browsing").unwrap(), "<span foreground=\"#b13dff\">󰈹</span>  $1"),
         (Regex::new(r"(.*) — Mozilla Firefox").unwrap(), "󰈹  $1"),
         // remove space between icons
-        (Regex::new(r"(󰈹|>)  (󰗃)").unwrap(), "$1 $2"),
+        (Regex::new(r"(>|󰈹)  (<)").unwrap(), "$1 $2"),
         (Regex::new(r"(.*) - Sublime Text \(.*\)").unwrap(), "  $1"),
         (Regex::new(r"(.*) - Discord").unwrap(), "󰙯  $1"),
     ];
