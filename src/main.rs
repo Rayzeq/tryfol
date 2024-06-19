@@ -18,7 +18,6 @@ mod dbusmenu;
 mod extensions;
 mod modules;
 mod network;
-mod notifier_host;
 mod rfkill;
 mod systray;
 mod things;

@@ -1,7 +1,7 @@
 use crate::{
-    backend::status_notifier::{self, Watcher},
+    backend::status_notifier::{self, run_host, Host},
     dbusmenu::DBusMenu,
-    notifier_host, HasTooltip,
+    HasTooltip,
 };
 use gtk::{
     gdk,
@@ -20,31 +20,7 @@ pub fn new() -> gtk::Box {
     let props = Props::new();
     spawn_systray(&container, &props);
 
-    let menu = DBusMenu::new("org.blueman.Tray", "/org/blueman/sni/menu");
-    std::mem::forget(menu);
-
     container
-}
-
-// DBus state shared between systray instances, to avoid creating too many connections etc.
-struct DBusSession {
-    snw: notifier_host::proxy::StatusNotifierWatcherProxy<'static>,
-}
-
-async fn dbus_session() -> zbus::Result<&'static DBusSession> {
-    // TODO make DBusSession reference counted so it's dropped when not in use?
-
-    static DBUS_STATE: tokio::sync::OnceCell<DBusSession> = tokio::sync::OnceCell::const_new();
-    DBUS_STATE
-        .get_or_try_init(|| async {
-            let con = zbus::Connection::session().await?;
-            Watcher::get_or_start(&con).await?;
-
-            let (_, snw) = notifier_host::register_as_host(&con).await?;
-
-            Ok(DBusSession { snw })
-        })
-        .await
 }
 
 fn run_async_task<F: Future>(f: F) -> F::Output {
@@ -82,16 +58,9 @@ pub fn spawn_systray(container: &gtk::Box, props: &Props) {
     };
 
     let task = glib::MainContext::default().spawn_local(async move {
-        let s = match dbus_session().await {
-            Ok(x) => x,
-            Err(e) => {
-                log::error!("could not initialise dbus connection for tray: {e:?}");
-                return;
-            }
-        };
-
+        let connection = zbus::Connection::session().await.unwrap();
         systray.container.set_visible(true);
-        let e = notifier_host::run_host(&mut systray, &s.snw).await;
+        let e = run_host(&connection, &mut systray).await;
         log::error!("notifier host error: {:?}", e);
     });
 
@@ -101,8 +70,8 @@ pub fn spawn_systray(container: &gtk::Box, props: &Props) {
     });
 }
 
-impl notifier_host::Host for Tray {
-    fn add_item(&mut self, id: &str, item: status_notifier::Item) {
+impl Host for Tray {
+    async fn item_registered(&mut self, id: &str, item: status_notifier::Item) {
         let item = Item::new(id.to_owned(), item);
         if *self.prepend_new.borrow() {
             self.container.append(&item.widget);
@@ -114,7 +83,7 @@ impl notifier_host::Host for Tray {
         }
     }
 
-    fn remove_item(&mut self, id: &str) {
+    async fn item_unregistered(&mut self, id: &str) {
         if let Some(item) = self.items.get(id) {
             self.container.remove(&item.widget);
             self.items.remove(id);
