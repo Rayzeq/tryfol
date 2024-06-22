@@ -1,12 +1,13 @@
 use gtk::{
+    gdk,
     glib::{
         self, clone,
         clone::{Downgrade, Upgrade},
         object::{Cast, IsA, ObjectExt},
         SignalHandlerId, WeakRef,
     },
-    prelude::WidgetExt,
-    EventControllerMotion, Tooltip, Widget,
+    prelude::*,
+    EventControllerMotion, EventSequenceState, GestureClick, Tooltip, Widget,
 };
 use gtk4 as gtk;
 
@@ -16,6 +17,29 @@ pub trait Hoverable {
         Self: Downgrade,
         Self::Weak: Upgrade,
         F: for<'a> Fn(&'a <Self::Weak as Upgrade>::Strong, bool) + 'static + Clone;
+}
+
+pub trait Clickable {
+    fn connect_clicked<F>(&self, button: u32, callback: F)
+    where
+        Self: Downgrade,
+        Self::Weak: Upgrade,
+        F: for<'a> Fn(&'a <Self::Weak as Upgrade>::Strong, i32, f64, f64) + 'static;
+    fn connect_left_clicked<F>(&self, callback: F)
+    where
+        Self: Downgrade,
+        Self::Weak: Upgrade,
+        F: for<'a> Fn(&'a <Self::Weak as Upgrade>::Strong, i32, f64, f64) + 'static;
+    fn connect_middle_clicked<F>(&self, callback: F)
+    where
+        Self: Downgrade,
+        Self::Weak: Upgrade,
+        F: for<'a> Fn(&'a <Self::Weak as Upgrade>::Strong, i32, f64, f64) + 'static;
+    fn connect_right_clicked<F>(&self, callback: F)
+    where
+        Self: Downgrade,
+        Self::Weak: Upgrade,
+        F: for<'a> Fn(&'a <Self::Weak as Upgrade>::Strong, i32, f64, f64) + 'static;
 }
 
 pub trait HasTooltip {
@@ -40,6 +64,48 @@ where
             callback(&this, false);
         }));
         self.add_controller(motion_controller);
+    }
+}
+
+impl<W> Clickable for W
+where
+    W: WidgetExt + Downgrade,
+    W::Weak: Upgrade,
+{
+    fn connect_clicked<F>(&self, button: u32, callback: F)
+    where
+        F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, i32, f64, f64) + 'static,
+    {
+        let gesture_controller = GestureClick::builder().button(button).build();
+        gesture_controller.connect_pressed(
+            clone!(@weak self as this => move |gesture, press_count, x, y| {
+                gesture.set_state(EventSequenceState::Claimed);
+                callback(&this, press_count, x, y);
+
+            }),
+        );
+        self.add_controller(gesture_controller);
+    }
+
+    fn connect_left_clicked<F>(&self, callback: F)
+    where
+        F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, i32, f64, f64) + 'static,
+    {
+        self.connect_clicked(gdk::BUTTON_PRIMARY, callback);
+    }
+
+    fn connect_middle_clicked<F>(&self, callback: F)
+    where
+        F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, i32, f64, f64) + 'static,
+    {
+        self.connect_clicked(gdk::BUTTON_MIDDLE, callback);
+    }
+
+    fn connect_right_clicked<F>(&self, callback: F)
+    where
+        F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, i32, f64, f64) + 'static,
+    {
+        self.connect_clicked(gdk::BUTTON_SECONDARY, callback);
     }
 }
 
