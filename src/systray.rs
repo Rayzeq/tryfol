@@ -1,14 +1,15 @@
 use crate::{
-    backend::status_notifier::{self, run_host, Status},
+    backend::status_notifier::{self, run_host, Orientation, Status},
     dbusmenu::DBusMenu,
-    Clickable, HasTooltip,
+    Clickable, HasTooltip, Scrollable,
 };
 use gtk::{
+    gdk::Paintable,
     glib::{self, clone},
     prelude::*,
-    Image,
+    Image, Widget,
 };
-use gtk4::{self as gtk, gdk::Paintable, Widget};
+use gtk4 as gtk;
 use log::error;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
@@ -142,9 +143,27 @@ impl Item {
             .connect_right_clicked(clone!(@strong self as this => move |_, _, x, y| {
                 glib::spawn_future_local(clone!(@strong this => async move {
                     #[allow(clippy::cast_possible_truncation)]
-                        if let Err(e) = this.popup_menu(x as i32, y as i32).await {
-                            error!("Error while handling middle click: {e}");
+                    if let Err(e) = this.popup_menu(x as i32, y as i32).await {
+                        error!("Error while handling right click: {e}");
+                    }
+                }));
+            }));
+
+        self.root
+            .connect_both_scroll(clone!(@strong self.item as item => move |_, dx, dy| {
+                glib::spawn_future_local(clone!(@strong item => async move {
+                    if dx != 0. {
+                        #[allow(clippy::cast_possible_truncation)]
+                        if let Err(e) = item.scroll(dx as i32, Orientation::Horizontal).await {
+                            error!("Error while handling scroll event: {e}");
                         }
+                    }
+                    if dy != 0. {
+                        #[allow(clippy::cast_possible_truncation)]
+                        if let Err(e) = item.scroll(dy as i32, Orientation::Vertical).await {
+                            error!("Error while handling scroll event: {e}");
+                        }
+                    }
                 }));
             }));
 
