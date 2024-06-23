@@ -9,7 +9,7 @@ use gtk::{
 };
 use gtk4 as gtk;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DBusMenu {
     client: dbus::Client,
     popover: PopoverMenu,
@@ -50,8 +50,12 @@ impl DBusMenu {
         this
     }
 
-    pub fn set_parent(&self, parent: &impl IsA<Widget>) {
-        self.popover.set_parent(parent);
+    pub fn set_parent(&self, parent: Option<&impl IsA<Widget>>) {
+        if let Some(parent) = parent {
+            self.popover.set_parent(parent);
+        } else {
+            self.popover.unparent();
+        }
     }
 
     pub fn popup(&self) {

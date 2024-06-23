@@ -1,4 +1,5 @@
 use super::proxy::{Category, ItemProxy, Orientation, Pixmap, Status};
+use crate::dbusmenu::DBusMenu;
 use anyhow::bail;
 use futures::StreamExt;
 use gtk4::{
@@ -13,22 +14,25 @@ use std::{
     cmp::Ordering,
     path::{Path, PathBuf},
 };
-use zbus::{names::BusName, zvariant::OwnedObjectPath, Connection};
+use zbus::{fdo, names::BusName, Connection};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Item {
     proxy: ItemProxy<'static>,
+    tasks: Vec<glib::JoinHandle<()>>,
 }
 
 macro_rules! connect_function {
     ($signal_name:ident, $arg_type:ty) => {
         paste! {
-            pub fn [<connect_ $signal_name _changed>]<F>(&self, callback: F)
+            /// Callbacks registered with this method will only be called as long as the instance is not dropped.
+            /// Cloned instances won't allow the callbacks to work.
+            pub fn [<connect_ $signal_name _changed>]<F>(&mut self, callback: F)
             where
                 F: Fn($arg_type) + 'static,
             {
                 let this = self.clone();
-                glib::spawn_future_local(async move {
+                let task = glib::spawn_future_local(async move {
                     let mut events = match this.proxy.[<receive_new_ $signal_name>]().await {
                         Ok(x) => x,
                         Err(e) => {
@@ -48,6 +52,7 @@ macro_rules! connect_function {
                         callback(new_value);
                     }
                 });
+                self.tasks.push(task);
             }
         }
     };
@@ -97,60 +102,93 @@ impl Item {
             .build()
             .await?;
 
-        Ok(Self { proxy })
+        Ok(Self {
+            proxy,
+            tasks: Vec::new(),
+        })
     }
 
     pub fn destination(&self) -> &BusName {
         self.proxy.inner().destination()
     }
 
-    pub async fn activate(&self, x: i32, y: i32) -> zbus::fdo::Result<()> {
-        self.proxy.activate(x, y).await
+    /// Return whether this method was actually called.
+    ///
+    /// This is useful because some menu-only items doesn't have an `activate` method, and doesn't report themselves as menu-only
+    /// through [`Self::item_is_menu`]. nm-applet is an example of this.
+    pub async fn activate(&self, x: i32, y: i32) -> zbus::Result<bool> {
+        match self.proxy.activate(x, y).await {
+            Ok(()) => Ok(true),
+            Err(zbus::Error::MethodError(name, _, _))
+                if name == "org.freedesktop.DBus.Error.UnknownMethod" =>
+            {
+                Ok(false)
+            }
+            Err(e) => {
+                println!("{e:?}");
+                Err(e)
+            }
+        }
     }
 
-    pub async fn secondary_activate(&self, x: i32, y: i32) -> zbus::fdo::Result<()> {
-        self.proxy.activate(x, y).await
+    pub async fn secondary_activate(&self, x: i32, y: i32) -> zbus::Result<()> {
+        self.proxy.secondary_activate(x, y).await
     }
 
     /// Prefer using the provided menu via [`Self::menu`] instead of this
-    pub async fn context_menu(&self, x: i32, y: i32) -> zbus::fdo::Result<()> {
+    pub async fn context_menu(&self, x: i32, y: i32) -> zbus::Result<()> {
         self.proxy.context_menu(x, y).await
     }
 
-    pub async fn scroll(&self, delta: i32, orientation: Orientation) -> zbus::fdo::Result<()> {
+    pub async fn scroll(&self, delta: i32, orientation: Orientation) -> zbus::Result<()> {
         self.proxy.scroll(delta, orientation).await
     }
 
-    pub async fn provide_xdg_activation_token(&self, token: &str) -> zbus::fdo::Result<()> {
+    pub async fn provide_xdg_activation_token(&self, token: &str) -> zbus::Result<()> {
         self.proxy.provide_xdg_activation_token(token).await
     }
 
-    pub async fn category(&self) -> zbus::fdo::Result<Category> {
+    pub async fn category(&self) -> zbus::Result<Category> {
         self.proxy.category().await
     }
 
-    pub async fn id(&self) -> zbus::fdo::Result<String> {
+    pub async fn id(&self) -> zbus::Result<String> {
         self.proxy.id().await
     }
 
-    pub async fn title(&self) -> zbus::fdo::Result<String> {
+    pub async fn title(&self) -> zbus::Result<String> {
         self.proxy.title().await
     }
 
-    pub async fn status(&self) -> zbus::fdo::Result<Status> {
+    pub async fn status(&self) -> zbus::Result<Status> {
         self.proxy.status().await
     }
 
-    pub async fn window_id(&self) -> zbus::fdo::Result<i32> {
+    pub async fn window_id(&self) -> zbus::Result<i32> {
         self.proxy.window_id().await
     }
 
-    pub async fn menu(&self) -> zbus::fdo::Result<OwnedObjectPath> {
-        self.proxy.menu().await
+    pub async fn menu(&self) -> zbus::Result<Option<DBusMenu>> {
+        match self.proxy.menu().await {
+            Ok(path) if path.is_empty() => Ok(None),
+            Ok(path) => Ok(Some(DBusMenu::new(self.destination(), &path))),
+            // error is likely "No such property “Menu”"
+            Err(zbus::Error::FDO(error)) if matches!(*error, fdo::Error::InvalidArgs(_)) => {
+                Ok(None)
+            }
+            Err(e) => Err(e),
+        }
     }
 
-    pub async fn item_is_menu(&self) -> zbus::fdo::Result<bool> {
-        self.proxy.item_is_menu().await
+    pub async fn item_is_menu(&self) -> zbus::Result<bool> {
+        match self.proxy.item_is_menu().await {
+            Ok(x) => Ok(x),
+            // error is likely "No such property “ItemIsMenu”"
+            Err(zbus::Error::FDO(error)) if matches!(*error, fdo::Error::InvalidArgs(_)) => {
+                Ok(false)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     pub async fn icon(&self, size: i32, scale: i32) -> anyhow::Result<Paintable> {
@@ -210,7 +248,7 @@ impl Item {
     connect_function!(icon, Paintable, size: i32, scale: i32);
     connect_function!(attention_icon, Paintable, size: i32, scale: i32);
     connect_function!(overlay_icon, Paintable, size: i32, scale: i32);
-    connect_function!(menu, OwnedObjectPath);
+    connect_function!(menu, Option<DBusMenu>);
 
     // #[zbus(signal)]
     // fn new_tool_tip(&self) -> zbus::fdo::Result<()>;
@@ -349,5 +387,23 @@ impl Item {
             pixmap.height,
             pixmap.width * 4,
         )
+    }
+}
+
+impl Clone for Item {
+    fn clone(&self) -> Self {
+        Self {
+            proxy: self.proxy.clone(),
+            // only the main instance have the tasks
+            tasks: Vec::new(),
+        }
+    }
+}
+
+impl Drop for Item {
+    fn drop(&mut self) {
+        for task in &self.tasks {
+            task.abort();
+        }
     }
 }

@@ -22,9 +22,9 @@ enum ItemEvent {
     UnregisteredItem(StatusNotifierItemUnregistered),
 }
 
-pub async fn run_host(connection: &Connection, host: &mut impl Host) -> zbus::Result<Infallible> {
-    let watcher = Watcher::get_or_start(connection).await?;
-    let connection = watcher.inner().connection();
+pub async fn run_host(host: &mut impl Host) -> zbus::Result<Infallible> {
+    let connection = Connection::session().await?;
+    let watcher = Watcher::get_or_start(&connection).await?;
 
     let pid = process::id();
     let mut i = 0;
@@ -56,7 +56,7 @@ pub async fn run_host(connection: &Connection, host: &mut impl Host) -> zbus::Re
     // Process initial items here. Since we already subscribed to events, we might have duplicates, but we can't
     // miss items (that's what I think at least)
     for item_id in watcher.registered_status_notifier_items().await? {
-        match Item::from_id(connection, &item_id).await {
+        match Item::from_id(&connection, &item_id).await {
             Ok(item) => {
                 host.item_registered(&item_id, item).await;
                 items.insert(item_id);
@@ -74,7 +74,7 @@ pub async fn run_host(connection: &Connection, host: &mut impl Host) -> zbus::Re
             ItemEvent::RegisteredItem(event) => {
                 let item_id = event.args()?.service;
                 if !items.contains(item_id) {
-                    match Item::from_id(connection, item_id).await {
+                    match Item::from_id(&connection, item_id).await {
                         Ok(item) => {
                             items.insert(item_id.to_owned());
                             host.item_registered(item_id, item).await;

@@ -75,7 +75,7 @@ trait Item {
     /// The application will perform any task is considered appropriate as an activation request.
     /// The x and y parameters are in screen coordinates and is to be considered an hint to the item
     /// where to show eventual windows (if any).
-    fn activate(&self, x: i32, y: i32) -> zbus::fdo::Result<()>;
+    fn activate(&self, x: i32, y: i32) -> zbus::Result<()>;
 
     /// Is to be considered a secondary and less important form of activation compared to Activate.
     /// This is typically a consequence of user input, such as mouse middle click over the graphical
@@ -83,77 +83,77 @@ trait Item {
     /// The application will perform any task is considered appropriate as an activation request.
     /// The x and y parameters are in screen coordinates and is to be considered an hint to the item
     /// where to show eventual windows (if any).
-    fn secondary_activate(&self, x: i32, y: i32) -> zbus::fdo::Result<()>;
+    fn secondary_activate(&self, x: i32, y: i32) -> zbus::Result<()>;
 
     /// Asks the status notifier item to show a context menu, this is typically a consequence of user input,
     /// such as mouse right click over the graphical representation of the item.
     /// The x and y parameters are in screen coordinates and is to be considered an hint to the item
     /// about where to show the context menu.
-    fn context_menu(&self, x: i32, y: i32) -> zbus::fdo::Result<()>;
+    fn context_menu(&self, x: i32, y: i32) -> zbus::Result<()>;
 
     /// The user asked for a scroll action.
     ///
     /// This is caused from input such as mouse wheel over the graphical representation of the item.
-    fn scroll(&self, delta: i32, orientation: Orientation) -> zbus::fdo::Result<()>;
+    fn scroll(&self, delta: i32, orientation: Orientation) -> zbus::Result<()>;
 
-    fn provide_xdg_activation_token(&self, token: &str) -> zbus::fdo::Result<()>;
+    fn provide_xdg_activation_token(&self, token: &str) -> zbus::Result<()>;
 
     #[zbus(property)]
-    fn category(&self) -> zbus::fdo::Result<Category>;
+    fn category(&self) -> zbus::Result<Category>;
 
     /// A name that should be unique for this application and consistent between sessions,
     /// such as the application name itself.
     #[zbus(property)]
-    fn id(&self) -> zbus::fdo::Result<String>;
+    fn id(&self) -> zbus::Result<String>;
 
     /// A name that describes the application, it can be more descriptive than [`Self::id`].
     #[zbus(property(emits_changed_signal = "false"))]
-    fn title(&self) -> zbus::fdo::Result<String>;
+    fn title(&self) -> zbus::Result<String>;
 
     #[zbus(property(emits_changed_signal = "false"))]
-    fn status(&self) -> zbus::fdo::Result<Status>;
+    fn status(&self) -> zbus::Result<Status>;
 
     /// It's the windowing-system dependent identifier for a window, the application can chose one of its windows
     /// to be available through this property or just set 0 if it's not interested.
     #[zbus(property)]
-    fn window_id(&self) -> zbus::fdo::Result<i32>;
+    fn window_id(&self) -> zbus::Result<i32>;
 
     /// An additional path to add to the theme search path to find the specified icons.
     #[zbus(property)]
-    fn icon_theme_path(&self) -> zbus::fdo::Result<String>;
+    fn icon_theme_path(&self) -> zbus::Result<String>;
 
     /// DBus path to an object which should implement the com.canonical.dbusmenu interface
     #[zbus(property(emits_changed_signal = "false"))]
-    fn menu(&self) -> zbus::fdo::Result<OwnedObjectPath>;
+    fn menu(&self) -> zbus::Result<OwnedObjectPath>;
 
     /// The item only support the context menu, the visualization should prefer showing the menu
     /// or sending [`Self::context_menu`] instead of [`Self::activate`]
     #[zbus(property)]
-    fn item_is_menu(&self) -> zbus::fdo::Result<bool>;
+    fn item_is_menu(&self) -> zbus::Result<bool>;
 
     /// The icon that should be shown.
     ///
     /// Using this property is preferred over [`Self::icon_pixmap`].
     #[zbus(property(emits_changed_signal = "false"))]
-    fn icon_name(&self) -> zbus::fdo::Result<String>;
+    fn icon_name(&self) -> zbus::Result<String>;
 
     #[zbus(property(emits_changed_signal = "false"))]
-    fn icon_pixmap(&self) -> zbus::fdo::Result<Vec<Pixmap>>;
+    fn icon_pixmap(&self) -> zbus::Result<Vec<Pixmap>>;
 
     #[zbus(property(emits_changed_signal = "false"))]
-    fn overlay_icon_name(&self) -> zbus::fdo::Result<String>;
+    fn overlay_icon_name(&self) -> zbus::Result<String>;
 
     #[zbus(property(emits_changed_signal = "false"))]
-    fn overlay_icon_pixmap(&self) -> zbus::fdo::Result<Vec<Pixmap>>;
+    fn overlay_icon_pixmap(&self) -> zbus::Result<Vec<Pixmap>>;
 
     #[zbus(property(emits_changed_signal = "false"))]
-    fn attention_icon_name(&self) -> zbus::fdo::Result<String>;
+    fn attention_icon_name(&self) -> zbus::Result<String>;
 
     #[zbus(property(emits_changed_signal = "false"))]
-    fn attention_icon_pixmap(&self) -> zbus::fdo::Result<Vec<Pixmap>>;
+    fn attention_icon_pixmap(&self) -> zbus::Result<Vec<Pixmap>>;
 
     #[zbus(property(emits_changed_signal = "false"))]
-    fn attention_movie_name(&self) -> zbus::fdo::Result<String>;
+    fn attention_movie_name(&self) -> zbus::Result<String>;
 
     /// Arguments:
     ///   - icon name
@@ -163,28 +163,28 @@ trait Item {
     ///   
     ///   [basic markup]: https://www.freedesktop.org/wiki/Specifications/StatusNotifierItem/Markup/
     #[zbus(property(emits_changed_signal = "false"))]
-    fn tool_tip(&self) -> zbus::fdo::Result<(String, Vec<Pixmap>, String, String)>;
+    fn tool_tip(&self) -> zbus::Result<(String, Vec<Pixmap>, String, String)>;
 
     #[zbus(signal)]
-    fn new_title(&self) -> zbus::fdo::Result<()>;
+    fn new_title(&self) -> zbus::Result<()>;
 
     #[zbus(signal)]
-    fn new_icon(&self) -> zbus::fdo::Result<()>;
+    fn new_icon(&self) -> zbus::Result<()>;
 
     #[zbus(signal)]
-    fn new_attention_icon(&self) -> zbus::fdo::Result<()>;
+    fn new_attention_icon(&self) -> zbus::Result<()>;
 
     #[zbus(signal)]
-    fn new_overlay_icon(&self) -> zbus::fdo::Result<()>;
+    fn new_overlay_icon(&self) -> zbus::Result<()>;
 
     #[zbus(signal)]
-    fn new_menu(&self) -> zbus::fdo::Result<()>;
+    fn new_menu(&self) -> zbus::Result<()>;
 
     #[zbus(signal)]
-    fn new_tool_tip(&self) -> zbus::fdo::Result<()>;
+    fn new_tool_tip(&self) -> zbus::Result<()>;
 
     #[zbus(signal)]
-    fn new_status(&self, status: Status) -> zbus::fdo::Result<()>;
+    fn new_status(&self, status: Status) -> zbus::Result<()>;
 }
 
 impl ItemProxy<'_> {

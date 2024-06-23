@@ -1,282 +1,199 @@
 use crate::{
-    backend::status_notifier::{self, run_host, Host},
+    backend::status_notifier::{self, run_host, Status},
     dbusmenu::DBusMenu,
-    HasTooltip,
+    Clickable, HasTooltip,
 };
 use gtk::{
-    gdk,
     glib::{self, clone},
     prelude::*,
-    EventControllerMotion, Image, Orientation,
+    Image,
 };
-use gtk4 as gtk;
-use std::{cell::RefCell, collections::HashMap, future::Future, rc::Rc};
+use gtk4::{self as gtk, gdk::Paintable, Widget};
+use log::error;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
+struct Host {
+    root: gtk::Box,
+    items: HashMap<String, Item>,
+}
+
+#[derive(Debug, Clone)]
+struct Item {
+    root: Image,
+    #[allow(clippy::struct_field_names)]
+    item: status_notifier::Item,
+    menu: Rc<RefCell<Option<DBusMenu>>>,
+}
 
 pub fn new() -> gtk::Box {
-    let container = gtk::Box::new(Orientation::Horizontal, 2);
-    container.set_widget_name("systray");
-    container.add_css_class("module");
+    let root = gtk::Box::builder()
+        .name("systray")
+        .css_classes(["module"])
+        .spacing(2)
+        .build();
 
-    let props = Props::new();
-    spawn_systray(&container, &props);
-
-    container
-}
-
-fn run_async_task<F: Future>(f: F) -> F::Output {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("Failed to initialize tokio runtime");
-    rt.block_on(f)
-}
-
-pub struct Props {
-    pub prepend_new: Rc<RefCell<bool>>,
-}
-
-impl Props {
-    pub fn new() -> Self {
-        Self {
-            prepend_new: Rc::new(RefCell::new(false)),
-        }
-    }
-}
-
-struct Tray {
-    container: gtk::Box,
-    items: HashMap<String, Item>,
-
-    prepend_new: Rc<RefCell<bool>>,
-}
-
-pub fn spawn_systray(container: &gtk::Box, props: &Props) {
-    let mut systray = Tray {
-        container: container.clone(),
-        items: HashMap::default(),
-        prepend_new: props.prepend_new.clone(),
+    let mut tray = Host {
+        root: root.clone(),
+        items: HashMap::new(),
     };
 
-    let task = glib::MainContext::default().spawn_local(async move {
-        let connection = zbus::Connection::session().await.unwrap();
-        systray.container.set_visible(true);
-        let e = run_host(&connection, &mut systray).await;
-        log::error!("notifier host error: {:?}", e);
+    let task = glib::spawn_future_local(async move {
+        if let Err(e) = run_host(&mut tray).await {
+            error!("Error while running the status notifier host: {e}");
+        }
     });
-
     // stop the task when the widget is dropped
-    container.connect_destroy(move |_| {
+    root.connect_destroy(move |_| {
         task.abort();
     });
+
+    root
 }
 
-impl Host for Tray {
+impl status_notifier::Host for Host {
     async fn item_registered(&mut self, id: &str, item: status_notifier::Item) {
-        let item = Item::new(id.to_owned(), item);
-        if *self.prepend_new.borrow() {
-            self.container.append(&item.widget);
+        let item = Item::new(id.to_owned(), item).await;
+
+        let item_root = item.root.clone();
+        if let Some(old_item) = self.items.insert(id.to_owned(), item) {
+            // replace the old child with the new one
+            self.root
+                .insert_child_after(&item_root, Some(&old_item.root));
+            self.root.remove(&old_item.root);
         } else {
-            self.container.prepend(&item.widget);
-        }
-        if let Some(old_item) = self.items.insert(id.to_string(), item) {
-            self.container.remove(&old_item.widget);
+            self.root.append(&item_root);
         }
     }
 
     async fn item_unregistered(&mut self, id: &str) {
-        if let Some(item) = self.items.get(id) {
-            self.container.remove(&item.widget);
-            self.items.remove(id);
-        } else {
-            log::warn!("Tried to remove nonexistent item {:?} from systray", id);
-        }
-    }
-}
-
-/// Item represents a single icon being shown in the system tray.
-struct Item {
-    /// Main widget representing this tray item.
-    widget: gtk::Box,
-
-    /// Async task to stop when this item gets removed.
-    task: Option<glib::JoinHandle<()>>,
-}
-
-impl Drop for Item {
-    fn drop(&mut self) {
-        if let Some(task) = &self.task {
-            task.abort();
+        if let Some(item) = self.items.remove(id) {
+            self.root.remove(&item.root);
         }
     }
 }
 
 impl Item {
-    const ICON_SIZE: i32 = 18;
+    const SIZE: i32 = 18;
 
-    fn new(id: String, item: status_notifier::Item) -> Self {
-        let gtk_widget = gtk::Box::new(Orientation::Horizontal, 0);
+    async fn new(id: String, item: status_notifier::Item) -> Self {
+        let root = Image::builder().pixel_size(Self::SIZE).build();
+        let mut this = Self {
+            root,
+            item,
+            menu: Rc::default(),
+        };
 
-        // Support :hover selector (is this still necessary ?)
-        let event_controller = EventControllerMotion::new();
-        event_controller.connect_enter(clone!(@strong gtk_widget => move |_, _, _| {
-                gtk_widget
-                    .set_state_flags(gtk::StateFlags::PRELIGHT, false);
-        }));
-        event_controller.connect_leave(clone!(@strong gtk_widget => move |_| {
-                gtk_widget
-                    .unset_state_flags(gtk::StateFlags::PRELIGHT);
-        }));
-        gtk_widget.add_controller(event_controller);
-
-        let out_widget = gtk_widget.clone(); // copy so we can return it
-
-        let task = glib::MainContext::default().spawn_local(async move {
-            if let Err(e) = Self::maintain(gtk_widget.clone(), item).await {
-                log::error!("error for systray item {}: {:?}", id, e);
-            }
-        });
-
-        Self {
-            widget: out_widget,
-            task: Some(task),
+        if let Err(e) = this.setup().await {
+            error!("Error setting up systray item {id}: {e}");
         }
+
+        this
     }
 
-    async fn maintain(widget: gtk::Box, mut item: status_notifier::Item) -> zbus::Result<()> {
-        // init icon
-        let icon = gtk::Image::new();
-        widget.append(&icon);
-
-        // init menu
-        let menu_real = Rc::new(RefCell::new(if let Ok(menu_path) = item.menu().await {
-            let menu = DBusMenu::new(item.destination(), &menu_path);
-            menu.set_parent(&widget);
-            Some(menu)
-        } else {
-            None
-        }));
-
-        // TODO this is a lot of code duplication unfortunately, i'm not really sure how to
-        // refactor without making the borrow checker angry
-
-        // set status
-        match item.status().await? {
-            status_notifier::Status::Passive => widget.set_visible(false),
-            status_notifier::Status::Active | status_notifier::Status::NeedsAttention => {
-                widget.set_visible(true);
-            }
-        }
-
-        // set title
-        widget.set_better_tooltip(Some(item.title().await?));
-
-        // set icon
-        let scale = icon.scale_factor();
-        load_icon_for_item(&icon, &item, Self::ICON_SIZE, scale).await;
-
-        let item_real = Rc::new(item);
-
-        let item = item_real.clone();
-        let menu = Rc::clone(&menu_real);
-        let gesture = gtk::GestureClick::new();
-        gesture.set_button(gdk::BUTTON_PRIMARY);
-        gesture.connect_pressed(move |gesture, _, x, y| {
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-
-            let (x, y) = (x as i32, y as i32);
-            let item_is_menu = run_async_task(async { item.item_is_menu().await });
-            let have_item_is_menu = item_is_menu.is_ok();
-            let item_is_menu = item_is_menu.unwrap_or(false);
-            log::debug!(
-                "mouse click button=primary, x={}, y={}, have_item_is_menu={}, item_is_menu={}",
-                x,
-                y,
-                have_item_is_menu,
-                item_is_menu
-            );
-            let result = if !item_is_menu {
-                let result = run_async_task(async { item.activate(x, y).await });
-                if result.is_err() && !have_item_is_menu {
-                    log::debug!("fallback to context menu due to: {}", result.unwrap_err());
-                    // Some applications are in fact menu-only (don't have Activate method)
-                    // but don't report so through ItemIsMenu property. Fallback to menu if
-                    // activate failed in this case.
-                    run_async_task(async { Self::popup_menu(&item, &menu, x, y).await })
-                } else {
-                    result.map_err(Into::into)
-                }
-            } else {
-                run_async_task(async { Self::popup_menu(&item, &menu, x, y).await })
-            };
-            if let Err(result) = result {
-                log::error!("failed to handle primary mouse click: {:?}", result);
-            }
-        });
-        widget.add_controller(gesture);
-
-        let item = item_real.clone();
-        let gesture = gtk::GestureClick::new();
-        gesture.set_button(gdk::BUTTON_MIDDLE);
-        gesture.connect_pressed(move |gesture, _, x, y| {
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-
-            let (x, y) = (x as i32, y as i32);
-            log::debug!("mouse click button=middle, x={}, y={}", x, y,);
-
-            if let Err(result) = run_async_task(async { item.secondary_activate(x, y).await }) {
-                log::error!("failed to handle middle mouse click: {:?}", result);
-            }
-        });
-        widget.add_controller(gesture);
-
-        let item = item_real;
-        let gesture = gtk::GestureClick::new();
-        gesture.set_button(gdk::BUTTON_SECONDARY);
-        gesture.connect_pressed(clone!(@strong item => move |gesture, _, x, y| {
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-            run_async_task(async { Self::popup_menu(&item, &menu_real, x as i32, y as i32).await }).unwrap();
-        }));
-        widget.add_controller(gesture);
-
-        item.connect_status_changed(clone!(@weak widget => move |new_status| match new_status {
-            status_notifier::Status::Passive => widget.set_visible(false),
-            status_notifier::Status::Active | status_notifier::Status::NeedsAttention => {
-                widget.set_visible(true)
-            }
-        }));
-        item.connect_title_changed(
-            clone!(@weak widget => move |new_title| widget.set_better_tooltip(Some(new_title))),
+    async fn setup(&mut self) -> anyhow::Result<()> {
+        Self::status_changed(&self.root, self.item.status().await?);
+        Self::title_changed(&self.root, self.item.title().await?);
+        Self::icon_changed(
+            &self.root,
+            &self.item.icon(Self::SIZE, self.root.scale_factor()).await?,
         );
-        item.connect_icon_changed(
-            Self::ICON_SIZE,
-            scale,
-            clone!(@weak widget => move |new_icon| {
-                icon.set_paintable(Some(&new_icon));
-            }),
-        );
+        Self::menu_changed(self, self.item.menu().await?);
+        self.connect_updaters();
+
+        self.root
+            .connect_left_clicked(clone!(@strong self as this => move |_, _, x, y| {
+                glib::spawn_future_local(clone!(@strong this => async move {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let (x, y) = (x as i32, y as i32);
+                    let item_is_menu = match this.item.item_is_menu().await {
+                        Ok(x) => x,
+                        Err(e) => {
+                            error!("Cannot check whether item is a menu: {e}");
+                            false
+                        }
+                    };
+
+                    let result = if item_is_menu {
+                        this.popup_menu(x, y).await
+                    } else {
+                        match this.item.activate(x, y).await {
+                            Ok(true) => Ok(()),
+                            Ok(false) => this.popup_menu(x, y).await,
+                            Err(e) => Err(e)
+                        }
+                    };
+                    if let Err(e) = result {
+                        error!("Error while handling left click: {e}");
+                    }
+                }));
+            }));
+
+        self.root
+            .connect_middle_clicked(clone!(@strong self.item as item => move |_, _, x, y| {
+                glib::spawn_future_local(clone!(@strong item => async move {
+                    #[allow(clippy::cast_possible_truncation)]
+                    if let Err(e) = item.secondary_activate(x as i32, y as i32).await {
+                        error!("Error while handling middle click: {e}");
+                    }
+                }));
+            }));
+
+        self.root
+            .connect_right_clicked(clone!(@strong self as this => move |_, _, x, y| {
+                glib::spawn_future_local(clone!(@strong this => async move {
+                    #[allow(clippy::cast_possible_truncation)]
+                        if let Err(e) = this.popup_menu(x as i32, y as i32).await {
+                            error!("Error while handling middle click: {e}");
+                        }
+                }));
+            }));
 
         Ok(())
     }
 
-    async fn popup_menu(
-        item: &status_notifier::Item,
-        menu: &Rc<RefCell<Option<DBusMenu>>>,
-        x: i32,
-        y: i32,
-    ) -> zbus::Result<()> {
-        if let Some(menu) = &*menu.borrow() {
-            menu.popup();
-            Ok(())
-        } else {
-            item.context_menu(x, y).await.map_err(Into::into)
+    fn connect_updaters(&mut self) {
+        self.item.connect_status_changed(clone!(@weak self.root as root => move |new_status| Self::status_changed(&root, new_status)));
+        self.item.connect_title_changed(clone!(@weak self.root as root => move |new_title| Self::title_changed(&root, new_title)));
+        self.item.connect_icon_changed(
+            Self::SIZE,
+            self.root.scale_factor(),
+            clone!(@weak self.root as root => move |new_icon| Self::icon_changed(&root, &new_icon)),
+        );
+        self.item.connect_menu_changed(
+            clone!(@strong self as this => move |new_menu| this.menu_changed(new_menu)),
+        );
+    }
+
+    fn status_changed(root: &Image, new_status: Status) {
+        match new_status {
+            Status::Passive => root.set_visible(false),
+            Status::Active | status_notifier::Status::NeedsAttention => root.set_visible(true),
         }
     }
-}
 
-async fn load_icon_for_item(icon: &Image, item: &status_notifier::Item, size: i32, scale: i32) {
-    icon.set_pixel_size(size);
-    icon.set_icon_name(None);
-    if let Ok(pixbuf) = item.icon(size, scale).await {
-        icon.set_paintable(Some(&pixbuf));
+    fn title_changed(root: &Image, new_title: String) {
+        root.set_better_tooltip(Some(new_title));
+    }
+
+    fn icon_changed(root: &Image, new_icon: &Paintable) {
+        root.set_paintable(Some(new_icon));
+    }
+
+    fn menu_changed(&self, new_menu: Option<DBusMenu>) {
+        if let Some(ref new_menu) = new_menu {
+            new_menu.set_parent(Some(&self.root));
+        }
+        if let Some(old_menu) = self.menu.replace(new_menu) {
+            old_menu.set_parent(None::<&Widget>);
+        }
+    }
+
+    async fn popup_menu(&self, x: i32, y: i32) -> zbus::Result<()> {
+        if let Some(menu) = &*self.menu.borrow() {
+            menu.popup();
+            // early return to avoid the RefCell guard being held across an await point
+            return Ok(());
+        }
+        self.item.context_menu(x, y).await.map_err(Into::into)
     }
 }
