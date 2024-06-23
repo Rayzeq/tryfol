@@ -1,5 +1,6 @@
 use gtk::{
     gdk,
+    glib::Propagation,
     glib::{
         self, clone,
         clone::{Downgrade, Upgrade},
@@ -7,7 +8,8 @@ use gtk::{
         SignalHandlerId, WeakRef,
     },
     prelude::*,
-    EventControllerMotion, EventSequenceState, GestureClick, Tooltip, Widget,
+    EventControllerMotion, EventControllerScroll, EventControllerScrollFlags, EventSequenceState,
+    GestureClick, Tooltip, Widget,
 };
 use gtk4 as gtk;
 
@@ -40,6 +42,24 @@ pub trait Clickable {
         Self: Downgrade,
         Self::Weak: Upgrade,
         F: for<'a> Fn(&'a <Self::Weak as Upgrade>::Strong, i32, f64, f64) + 'static;
+}
+
+pub trait Scrollable {
+    fn connect_horizontal_scroll<F>(&self, callback: F)
+    where
+        Self: Downgrade,
+        Self::Weak: Upgrade,
+        F: for<'a> Fn(&'a <Self::Weak as Upgrade>::Strong, f64) + 'static;
+    fn connect_vertical_scroll<F>(&self, callback: F)
+    where
+        Self: Downgrade,
+        Self::Weak: Upgrade,
+        F: for<'a> Fn(&'a <Self::Weak as Upgrade>::Strong, f64) + 'static;
+    fn connect_both_scroll<F>(&self, callback: F)
+    where
+        Self: Downgrade,
+        Self::Weak: Upgrade,
+        F: for<'a> Fn(&'a <Self::Weak as Upgrade>::Strong, f64, f64) + 'static;
 }
 
 pub trait HasTooltip {
@@ -106,6 +126,54 @@ where
         F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, i32, f64, f64) + 'static,
     {
         self.connect_clicked(gdk::BUTTON_SECONDARY, callback);
+    }
+}
+
+impl<W> Scrollable for W
+where
+    W: WidgetExt + Downgrade,
+    W::Weak: Upgrade,
+{
+    fn connect_horizontal_scroll<F>(&self, callback: F)
+    where
+        F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, f64) + 'static,
+    {
+        let scroll_controller = EventControllerScroll::new(EventControllerScrollFlags::HORIZONTAL);
+        scroll_controller.connect_scroll(
+            clone!(@weak self as this => @default-return Propagation::Proceed, move |_, dx, _| {
+                callback(&this, dx);
+                Propagation::Stop
+            }),
+        );
+        self.add_controller(scroll_controller);
+    }
+
+    fn connect_vertical_scroll<F>(&self, callback: F)
+    where
+        F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, f64) + 'static,
+    {
+        let scroll_controller = EventControllerScroll::new(EventControllerScrollFlags::VERTICAL);
+        scroll_controller.connect_scroll(
+            clone!(@weak self as this => @default-return Propagation::Proceed, move |_, _, dy| {
+                callback(&this, dy);
+                Propagation::Stop
+            }),
+        );
+        self.add_controller(scroll_controller);
+    }
+
+    fn connect_both_scroll<F>(&self, callback: F)
+    where
+        F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, f64, f64) + 'static,
+    {
+        let scroll_controller = EventControllerScroll::new(EventControllerScrollFlags::BOTH_AXES);
+        scroll_controller.connect_scroll(
+            clone!(@weak self as this => @default-return Propagation::Proceed, move |_, dx, dy| {
+                callback(&this, dx, dy);
+                Propagation::Stop
+            }),
+        );
+        self.add_controller(scroll_controller);
     }
 }
 
