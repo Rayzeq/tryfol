@@ -1,91 +1,33 @@
 use super::proxy::{Category, ItemProxy, Orientation, Pixmap, Status};
 use crate::dbusmenu::DBusMenu;
 use anyhow::bail;
-use futures::StreamExt;
+use futures::{stream::select_all, Stream, StreamExt};
 use gtk4::{
     gdk::{Display, Paintable, Texture},
     gdk_pixbuf::{Colorspace, InterpType, Pixbuf},
-    glib::{self, Bytes},
+    glib::Bytes,
     IconLookupFlags, IconPaintable, IconTheme, TextDirection,
 };
 use log::error;
-use paste::paste;
 use std::{
     cmp::Ordering,
     path::{Path, PathBuf},
+    pin::Pin,
 };
 use zbus::{fdo, names::BusName, Connection};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Item {
     proxy: ItemProxy<'static>,
-    tasks: Vec<glib::JoinHandle<()>>,
 }
 
-macro_rules! connect_function {
-    ($signal_name:ident, $arg_type:ty) => {
-        paste! {
-            /// Callbacks registered with this method will only be called as long as the instance is not dropped.
-            /// Cloned instances won't allow the callbacks to work.
-            pub fn [<connect_ $signal_name _changed>]<F>(&mut self, callback: F)
-            where
-                F: Fn($arg_type) + 'static,
-            {
-                let this = self.clone();
-                let task = glib::spawn_future_local(async move {
-                    let mut events = match this.proxy.[<receive_new_ $signal_name>]().await {
-                        Ok(x) => x,
-                        Err(e) => {
-                            error!(concat!("Failed to receive new ", stringify!($signal_name), " events: {}"), e);
-                            return;
-                        }
-                    };
-
-                    while events.next().await.is_some() {
-                        let new_value = match this.$signal_name().await {
-                            Ok(x) => x,
-                            Err(e) => {
-                                error!(concat!("Failed to get ", stringify!($signal_name), ": {}"), e);
-                                continue;
-                            }
-                        };
-                        callback(new_value);
-                    }
-                });
-                self.tasks.push(task);
-            }
-        }
-    };
-    ($signal_name:ident, $arg_type:ty, $($additial_args_name:ident: $additial_args_type:ty),*) => {
-        paste! {
-            pub fn [<connect_ $signal_name _changed>]<F>(&self, $($additial_args_name: $additial_args_type),*, callback: F)
-            where
-                F: Fn($arg_type) + 'static,
-            {
-                let this = self.clone();
-                glib::spawn_future_local(async move {
-                    let mut events = match this.proxy.[<receive_new_ $signal_name>]().await {
-                        Ok(x) => x,
-                        Err(e) => {
-                            error!(concat!("Failed to receive new ", stringify!($signal_name), " events: {}"), e);
-                            return;
-                        }
-                    };
-
-                    while events.next().await.is_some() {
-                        let new_value = match this.$signal_name($($additial_args_name),*).await {
-                            Ok(x) => x,
-                            Err(e) => {
-                                error!(concat!("Failed to get ", stringify!($signal_name), ": {}"), e);
-                                continue;
-                            }
-                        };
-                        callback(new_value);
-                    }
-                });
-            }
-        }
-    };
+pub enum Event {
+    NewTitle,
+    NewStatus(Status),
+    NewIcon,
+    NewAttentionIcon,
+    NewOverlayIcon,
+    NewMenu,
 }
 
 impl Item {
@@ -102,10 +44,7 @@ impl Item {
             .build()
             .await?;
 
-        Ok(Self {
-            proxy,
-            tasks: Vec::new(),
-        })
+        Ok(Self { proxy })
     }
 
     pub fn destination(&self) -> &BusName {
@@ -243,12 +182,34 @@ impl Item {
     // #[zbus(property(emits_changed_signal = "false"))]
     // fn tool_tip(&self) -> zbus::fdo::Result<(String, Vec<Pixmap>, String, String)>;
 
-    connect_function!(title, String);
-    connect_function!(status, Status);
-    connect_function!(icon, Paintable, size: i32, scale: i32);
-    connect_function!(attention_icon, Paintable, size: i32, scale: i32);
-    connect_function!(overlay_icon, Paintable, size: i32, scale: i32);
-    connect_function!(menu, Option<DBusMenu>);
+    pub async fn events(&self) -> zbus::Result<impl Stream<Item = Event>> {
+        let title_events = self.proxy.receive_new_title().await?;
+        let status_events = self.proxy.receive_new_status().await?;
+        let icon_events = self.proxy.receive_new_icon().await?;
+        let attention_icon_events = self.proxy.receive_new_attention_icon().await?;
+        let overlay_icon_events = self.proxy.receive_new_overlay_icon().await?;
+        let menu_events = self.proxy.receive_new_menu().await?;
+
+        let status_event = status_events.filter_map(|event| async move {
+            match event.args() {
+                Ok(args) => Some(Event::NewStatus(args.status)),
+                Err(e) => {
+                    error!("Cannot parse signal args: {e}");
+                    None
+                }
+            }
+        });
+
+        let streams: [Pin<Box<dyn Stream<Item = Event>>>; 6] = [
+            Box::pin(title_events.map(|_| Event::NewTitle)),
+            Box::pin(status_event),
+            Box::pin(icon_events.map(|_| Event::NewIcon)),
+            Box::pin(attention_icon_events.map(|_| Event::NewAttentionIcon)),
+            Box::pin(overlay_icon_events.map(|_| Event::NewOverlayIcon)),
+            Box::pin(menu_events.map(|_| Event::NewMenu)),
+        ];
+        Ok(select_all(streams))
+    }
 
     // #[zbus(signal)]
     // fn new_tool_tip(&self) -> zbus::fdo::Result<()>;
@@ -387,23 +348,5 @@ impl Item {
             pixmap.height,
             pixmap.width * 4,
         )
-    }
-}
-
-impl Clone for Item {
-    fn clone(&self) -> Self {
-        Self {
-            proxy: self.proxy.clone(),
-            // only the main instance have the tasks
-            tasks: Vec::new(),
-        }
-    }
-}
-
-impl Drop for Item {
-    fn drop(&mut self) {
-        for task in &self.tasks {
-            task.abort();
-        }
     }
 }

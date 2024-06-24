@@ -1,28 +1,36 @@
 use crate::{
-    backend::status_notifier::{self, run_host, Orientation, Status},
+    backend::status_notifier::{self, run_host, Event, Orientation, Status},
     dbusmenu::DBusMenu,
     Clickable, HasTooltip, Scrollable,
 };
-use gtk::{
+use anyhow::Context;
+use futures::StreamExt;
+use gtk4::{
+    self as gtk,
     gdk::Paintable,
+    glib::JoinHandle,
     glib::{self, clone},
     prelude::*,
     Image, Widget,
 };
-use gtk4 as gtk;
 use log::error;
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, convert::Infallible, rc::Rc};
 
 struct Host {
     root: gtk::Box,
-    items: HashMap<String, Item>,
+    items: HashMap<String, (Image, JoinHandle<()>)>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct Item {
     root: Image,
     #[allow(clippy::struct_field_names)]
     item: status_notifier::Item,
+
+    // cache
+    status: Status,
+    icon: Paintable,
+    attention_icon: Paintable,
     menu: Rc<RefCell<Option<DBusMenu>>>,
 }
 
@@ -53,22 +61,28 @@ pub fn new() -> gtk::Box {
 
 impl status_notifier::Host for Host {
     async fn item_registered(&mut self, id: &str, item: status_notifier::Item) {
-        let item = Item::new(id.to_owned(), item).await;
+        let (item, task) = match Item::new(id.to_owned(), item).await {
+            Ok(x) => x,
+            Err(e) => {
+                error!("Error while handling new item: {e}");
+                return;
+            }
+        };
 
-        let item_root = item.root.clone();
-        if let Some(old_item) = self.items.insert(id.to_owned(), item) {
+        if let Some((old_item, old_task)) = self.items.insert(id.to_owned(), (item.clone(), task)) {
             // replace the old child with the new one
-            self.root
-                .insert_child_after(&item_root, Some(&old_item.root));
-            self.root.remove(&old_item.root);
+            self.root.insert_child_after(&item, Some(&old_item));
+            self.root.remove(&old_item);
+            old_task.abort();
         } else {
-            self.root.append(&item_root);
+            self.root.append(&item);
         }
     }
 
     async fn item_unregistered(&mut self, id: &str) {
-        if let Some(item) = self.items.remove(id) {
-            self.root.remove(&item.root);
+        if let Some((item, task)) = self.items.remove(id) {
+            self.root.remove(&item);
+            task.abort();
         }
     }
 }
@@ -76,37 +90,62 @@ impl status_notifier::Host for Host {
 impl Item {
     const SIZE: i32 = 18;
 
-    async fn new(id: String, item: status_notifier::Item) -> Self {
+    /// Create an item, setup listeners, and returns the root widget.
+    #[allow(clippy::new_ret_no_self)]
+    async fn new(
+        id: String,
+        item: status_notifier::Item,
+    ) -> anyhow::Result<(Image, JoinHandle<()>)> {
         let root = Image::builder().pixel_size(Self::SIZE).build();
+
+        let initial_status = item
+            .status()
+            .await
+            .context("While getting the initial status")?;
+        let initial_icon = item
+            .icon(Self::SIZE, root.scale_factor())
+            .await
+            .context("While getting the initial icon")?;
+        let initial_attention_icon = item
+            .attention_icon(Self::SIZE, root.scale_factor())
+            .await
+            .context("While getting the initial attention icon")?;
+
         let mut this = Self {
             root,
             item,
+
+            status: initial_status,
+            icon: initial_icon,
+            attention_icon: initial_attention_icon,
             menu: Rc::default(),
         };
+        let root = this.root.clone();
 
         if let Err(e) = this.setup().await {
             error!("Error setting up systray item {id}: {e}");
         }
+        let task = glib::spawn_future_local(async move {
+            if let Err(e) = this.listen().await {
+                error!("Error while handling events: {e}");
+            }
+        });
 
-        this
+        Ok((root, task))
     }
 
     async fn setup(&mut self) -> anyhow::Result<()> {
-        Self::status_changed(&self.root, self.item.status().await?);
-        Self::title_changed(&self.root, self.item.title().await?);
-        Self::icon_changed(
-            &self.root,
-            &self.item.icon(Self::SIZE, self.root.scale_factor()).await?,
-        );
-        Self::menu_changed(self, self.item.menu().await?);
-        self.connect_updaters();
+        self.title_changed().await;
+        // this will set the right icon
+        self.status_changed(self.item.status().await?);
+        self.menu_changed().await;
 
-        self.root
-            .connect_left_clicked(clone!(@strong self as this => move |_, _, x, y| {
-                glib::spawn_future_local(clone!(@strong this => async move {
+        self.root.connect_left_clicked(
+            clone!(@strong self.item as item, @strong self.menu as menu => move |_, _, x, y| {
+                glib::spawn_future_local(clone!(@strong item, @strong menu => async move {
                     #[allow(clippy::cast_possible_truncation)]
                     let (x, y) = (x as i32, y as i32);
-                    let item_is_menu = match this.item.item_is_menu().await {
+                    let item_is_menu = match item.item_is_menu().await {
                         Ok(x) => x,
                         Err(e) => {
                             error!("Cannot check whether item is a menu: {e}");
@@ -115,11 +154,11 @@ impl Item {
                     };
 
                     let result = if item_is_menu {
-                        this.popup_menu(x, y).await
+                        Self::popup_menu(item, menu, x, y).await
                     } else {
-                        match this.item.activate(x, y).await {
+                        match item.activate(x, y).await {
                             Ok(true) => Ok(()),
-                            Ok(false) => this.popup_menu(x, y).await,
+                            Ok(false) => Self::popup_menu(item, menu, x, y).await,
                             Err(e) => Err(e)
                         }
                     };
@@ -127,7 +166,8 @@ impl Item {
                         error!("Error while handling left click: {e}");
                     }
                 }));
-            }));
+            }),
+        );
 
         self.root
             .connect_middle_clicked(clone!(@strong self.item as item => move |_, _, x, y| {
@@ -139,15 +179,16 @@ impl Item {
                 }));
             }));
 
-        self.root
-            .connect_right_clicked(clone!(@strong self as this => move |_, _, x, y| {
-                glib::spawn_future_local(clone!(@strong this => async move {
+        self.root.connect_right_clicked(
+            clone!(@strong self.item as item, @strong self.menu as menu => move |_, _, x, y| {
+                glib::spawn_future_local(clone!(@strong item, @strong menu => async move {
                     #[allow(clippy::cast_possible_truncation)]
-                    if let Err(e) = this.popup_menu(x as i32, y as i32).await {
+                    if let Err(e) = Self::popup_menu(item, menu, x as i32, y as i32).await {
                         error!("Error while handling right click: {e}");
                     }
                 }));
-            }));
+            }),
+        );
 
         self.root
             .connect_both_scroll(clone!(@strong self.item as item => move |_, dx, dy| {
@@ -170,49 +211,100 @@ impl Item {
         Ok(())
     }
 
-    fn connect_updaters(&mut self) {
-        self.item.connect_status_changed(clone!(@weak self.root as root => move |new_status| Self::status_changed(&root, new_status)));
-        self.item.connect_title_changed(clone!(@weak self.root as root => move |new_title| Self::title_changed(&root, new_title)));
-        self.item.connect_icon_changed(
-            Self::SIZE,
-            self.root.scale_factor(),
-            clone!(@weak self.root as root => move |new_icon| Self::icon_changed(&root, &new_icon)),
-        );
-        self.item.connect_menu_changed(
-            clone!(@strong self as this => move |new_menu| this.menu_changed(new_menu)),
-        );
+    async fn listen(mut self) -> zbus::Result<Infallible> {
+        let mut events = self.item.events().await?;
+
+        while let Some(event) = events.next().await {
+            match event {
+                Event::NewTitle => self.title_changed().await,
+                Event::NewStatus(new_status) => self.status_changed(new_status),
+                Event::NewIcon => self.icon_changed().await,
+                Event::NewAttentionIcon => self.attention_icon_changed().await,
+                Event::NewOverlayIcon => println!("Overlay icons aren't supported"),
+                Event::NewMenu => self.menu_changed().await,
+            }
+        }
+
+        unreachable!()
     }
 
-    fn status_changed(root: &Image, new_status: Status) {
-        match new_status {
-            Status::Passive => root.set_visible(false),
-            Status::Active | status_notifier::Status::NeedsAttention => root.set_visible(true),
+    async fn title_changed(&self) {
+        match self.item.title().await {
+            Ok(new_title) => self.root.set_better_tooltip(Some(new_title)),
+            Err(e) => error!("Cannot get item title: {e}"),
         }
     }
 
-    fn title_changed(root: &Image, new_title: String) {
-        root.set_better_tooltip(Some(new_title));
-    }
-
-    fn icon_changed(root: &Image, new_icon: &Paintable) {
-        root.set_paintable(Some(new_icon));
-    }
-
-    fn menu_changed(&self, new_menu: Option<DBusMenu>) {
-        if let Some(ref new_menu) = new_menu {
-            new_menu.set_parent(Some(&self.root));
-        }
-        if let Some(old_menu) = self.menu.replace(new_menu) {
-            old_menu.set_parent(None::<&Widget>);
+    fn status_changed(&mut self, new_status: Status) {
+        self.status = new_status;
+        match self.status {
+            Status::Passive => self.root.set_visible(false),
+            Status::Active => {
+                self.root.set_paintable(Some(&self.icon));
+                self.root.set_visible(true);
+            }
+            Status::NeedsAttention => {
+                self.root.set_paintable(Some(&self.attention_icon));
+                self.root.set_visible(true);
+            }
         }
     }
 
-    async fn popup_menu(&self, x: i32, y: i32) -> zbus::Result<()> {
-        if let Some(menu) = &*self.menu.borrow() {
+    async fn icon_changed(&mut self) {
+        self.icon = match self.item.icon(Self::SIZE, self.root.scale_factor()).await {
+            Ok(x) => x,
+            Err(e) => {
+                error!("Cannot get item icon: {e}");
+                return;
+            }
+        };
+        if self.status == Status::Active {
+            self.root.set_paintable(Some(&self.icon));
+        }
+    }
+
+    async fn attention_icon_changed(&mut self) {
+        self.attention_icon = match self
+            .item
+            .attention_icon(Self::SIZE, self.root.scale_factor())
+            .await
+        {
+            Ok(x) => x,
+            Err(e) => {
+                error!("Cannot get item attention icon: {e}");
+                return;
+            }
+        };
+        if self.status == Status::NeedsAttention {
+            self.root.set_paintable(Some(&self.attention_icon));
+        }
+    }
+
+    async fn menu_changed(&self) {
+        match self.item.menu().await {
+            Ok(new_menu) => {
+                if let Some(ref new_menu) = new_menu {
+                    new_menu.set_parent(Some(&self.root));
+                }
+                if let Some(old_menu) = self.menu.replace(new_menu) {
+                    old_menu.set_parent(None::<&Widget>);
+                }
+            }
+            Err(e) => error!("Cannot get item menu: {e}"),
+        }
+    }
+
+    async fn popup_menu(
+        item: status_notifier::Item,
+        menu: Rc<RefCell<Option<DBusMenu>>>,
+        x: i32,
+        y: i32,
+    ) -> zbus::Result<()> {
+        if let Some(menu) = &*menu.borrow() {
             menu.popup();
             // early return to avoid the RefCell guard being held across an await point
             return Ok(());
         }
-        self.item.context_menu(x, y).await.map_err(Into::into)
+        item.context_menu(x, y).await.map_err(Into::into)
     }
 }
