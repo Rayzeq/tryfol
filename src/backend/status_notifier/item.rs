@@ -141,9 +141,13 @@ impl Item {
             scale,
         )
         .await
+        .and_then(|icon| {
+            icon.map(Result::Ok)
+                .unwrap_or_else(|| Self::get_default_icon(size, scale))
+        })
     }
 
-    pub async fn overlay_icon(&self, size: i32, scale: i32) -> anyhow::Result<Paintable> {
+    pub async fn overlay_icon(&self, size: i32, scale: i32) -> anyhow::Result<Option<Paintable>> {
         self.get_icon(
             self.proxy.overlay_icon_name().await.ok().as_deref(),
             self.proxy
@@ -167,6 +171,10 @@ impl Item {
             scale,
         )
         .await
+        .and_then(|icon| {
+            icon.map(Result::Ok)
+                .unwrap_or_else(|| Self::get_default_icon(size, scale))
+        })
     }
 
     // #[zbus(property(emits_changed_signal = "false"))]
@@ -223,36 +231,23 @@ impl Item {
         pixmaps: Vec<Pixmap>,
         size: i32,
         scale: i32,
-    ) -> anyhow::Result<Paintable> {
+    ) -> anyhow::Result<Option<Paintable>> {
         if let Some(name) = name {
             let icon_path = Path::new(&name);
             if icon_path.is_absolute() && icon_path.is_file() {
-                return Self::load_icon_from_path(icon_path, size, scale);
+                return Self::load_icon_from_path(icon_path, size, scale).map(Option::Some);
             }
 
             if let Some(icon) = self.get_icon_by_name(name, size, scale).await? {
-                return Ok(icon.into());
+                return Ok(Some(icon.into()));
             }
         }
 
         if let Some(icon) = Self::icon_from_pixmaps(pixmaps, size * scale) {
-            return Ok(Texture::for_pixbuf(&icon).into());
+            return Ok(Some(Texture::for_pixbuf(&icon).into()));
         }
 
-        let Some(display) = Display::default() else {
-            bail!("No default display found");
-        };
-        let icon_theme = IconTheme::for_display(&display);
-        Ok(icon_theme
-            .lookup_icon(
-                "image-missing",
-                &[],
-                size,
-                scale,
-                TextDirection::Ltr,
-                IconLookupFlags::PRELOAD,
-            )
-            .into())
+        Ok(None)
     }
 
     fn load_icon_from_path(path: &Path, size: i32, scale: i32) -> anyhow::Result<Paintable> {
@@ -348,5 +343,22 @@ impl Item {
             pixmap.height,
             pixmap.width * 4,
         )
+    }
+
+    fn get_default_icon(size: i32, scale: i32) -> anyhow::Result<Paintable> {
+        let Some(display) = Display::default() else {
+            bail!("No default display found");
+        };
+        let icon_theme = IconTheme::for_display(&display);
+        Ok(icon_theme
+            .lookup_icon(
+                "image-missing",
+                &[],
+                size,
+                scale,
+                TextDirection::Ltr,
+                IconLookupFlags::PRELOAD,
+            )
+            .into())
     }
 }
