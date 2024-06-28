@@ -8,22 +8,23 @@ use futures::StreamExt;
 use gtk4::{
     self as gtk,
     gdk::Paintable,
-    glib::JoinHandle,
-    glib::{self, clone},
+    glib::{self, clone, JoinHandle},
     prelude::*,
-    Image, Widget,
+    Image, Overlay, Widget,
 };
 use log::error;
 use std::{cell::RefCell, collections::HashMap, convert::Infallible, rc::Rc};
 
 struct Host {
     root: gtk::Box,
-    items: HashMap<String, (Image, JoinHandle<()>)>,
+    items: HashMap<String, (Overlay, JoinHandle<()>)>,
 }
 
 #[derive(Debug)]
 struct Item {
-    root: Image,
+    root: Overlay,
+    base: Image,
+    overlay: Image,
     #[allow(clippy::struct_field_names)]
     item: status_notifier::Item,
 
@@ -95,24 +96,30 @@ impl Item {
     async fn new(
         id: String,
         item: status_notifier::Item,
-    ) -> anyhow::Result<(Image, JoinHandle<()>)> {
-        let root = Image::builder().pixel_size(Self::SIZE).build();
+    ) -> anyhow::Result<(Overlay, JoinHandle<()>)> {
+        let base = Image::builder().pixel_size(Self::SIZE).build();
+        let overlay = Image::builder().pixel_size(Self::SIZE).build();
+
+        let root = Overlay::builder().child(&base).build();
+        root.add_overlay(&overlay);
 
         let initial_status = item
             .status()
             .await
             .context("While getting the initial status")?;
         let initial_icon = item
-            .icon(Self::SIZE, root.scale_factor())
+            .icon(Self::SIZE, base.scale_factor())
             .await
             .context("While getting the initial icon")?;
         let initial_attention_icon = item
-            .attention_icon(Self::SIZE, root.scale_factor())
+            .attention_icon(Self::SIZE, base.scale_factor())
             .await
             .context("While getting the initial attention icon")?;
 
         let mut this = Self {
             root,
+            base,
+            overlay,
             item,
 
             status: initial_status,
@@ -138,6 +145,7 @@ impl Item {
         self.title_changed().await;
         // this will set the right icon
         self.status_changed(self.item.status().await?);
+        self.overlay_icon_changed().await;
         self.menu_changed().await;
 
         self.root.connect_left_clicked(
@@ -220,7 +228,7 @@ impl Item {
                 Event::NewStatus(new_status) => self.status_changed(new_status),
                 Event::NewIcon => self.icon_changed().await,
                 Event::NewAttentionIcon => self.attention_icon_changed().await,
-                Event::NewOverlayIcon => println!("Overlay icons aren't supported"),
+                Event::NewOverlayIcon => self.overlay_icon_changed().await,
                 Event::NewMenu => self.menu_changed().await,
             }
         }
@@ -240,18 +248,18 @@ impl Item {
         match self.status {
             Status::Passive => self.root.set_visible(false),
             Status::Active => {
-                self.root.set_paintable(Some(&self.icon));
+                self.base.set_paintable(Some(&self.icon));
                 self.root.set_visible(true);
             }
             Status::NeedsAttention => {
-                self.root.set_paintable(Some(&self.attention_icon));
+                self.base.set_paintable(Some(&self.attention_icon));
                 self.root.set_visible(true);
             }
         }
     }
 
     async fn icon_changed(&mut self) {
-        self.icon = match self.item.icon(Self::SIZE, self.root.scale_factor()).await {
+        self.icon = match self.item.icon(Self::SIZE, self.base.scale_factor()).await {
             Ok(x) => x,
             Err(e) => {
                 error!("Cannot get item icon: {e}");
@@ -259,14 +267,14 @@ impl Item {
             }
         };
         if self.status == Status::Active {
-            self.root.set_paintable(Some(&self.icon));
+            self.base.set_paintable(Some(&self.icon));
         }
     }
 
     async fn attention_icon_changed(&mut self) {
         self.attention_icon = match self
             .item
-            .attention_icon(Self::SIZE, self.root.scale_factor())
+            .attention_icon(Self::SIZE, self.base.scale_factor())
             .await
         {
             Ok(x) => x,
@@ -276,8 +284,24 @@ impl Item {
             }
         };
         if self.status == Status::NeedsAttention {
-            self.root.set_paintable(Some(&self.attention_icon));
+            self.base.set_paintable(Some(&self.attention_icon));
         }
+    }
+
+    async fn overlay_icon_changed(&mut self) {
+        let icon = match self
+            .item
+            .overlay_icon(Self::SIZE, self.overlay.scale_factor())
+            .await
+        {
+            Ok(x) => x,
+            Err(e) => {
+                error!("Cannot get item attention icon: {e}");
+                return;
+            }
+        };
+
+        self.overlay.set_paintable(icon.as_ref());
     }
 
     async fn menu_changed(&self) {
