@@ -19,7 +19,6 @@ mod extensions;
 mod modules;
 mod network;
 mod rfkill;
-mod systray;
 mod things;
 pub use extensions::*;
 
