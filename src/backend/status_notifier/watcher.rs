@@ -42,7 +42,9 @@ impl Watcher {
                 RequestNameReply::AlreadyOwner
                 | RequestNameReply::PrimaryOwner
                 | RequestNameReply::Exists,
-            ) => Ok(WatcherProxy::new(connection).await?),
+            )
+            // I hate dbus
+            | Err(zbus::Error::NameTaken) => Ok(WatcherProxy::new(connection).await?),
             Ok(RequestNameReply::InQueue) => unreachable!(),
             Err(e) => Err(e),
         }
