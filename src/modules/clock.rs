@@ -24,11 +24,14 @@ pub fn new() -> Button {
         .build();
     popover.set_parent(&button);
 
-    button.connect_clicked(move |_| {
+    button.connect_clicked(move |this| {
         match DateTime::now_local() {
             Ok(datetime) => calendar.select_day(&datetime),
             Err(e) => error!("Cannot get current date: {e}"),
         }
+        // 8 is a magic value because I don't want to read the positionning code for popovers,
+        // so I have no idea where it comes from
+        popover.set_offset(-this.width() + 8, 0);
         popover.popup();
     });
 
