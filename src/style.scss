@@ -43,8 +43,7 @@ $color12: #f7768e;
 }
 
 tooltip,
-popover,
-calendar {
+popover {
 	background-color: rgba(0, 0, 0, 0.8);
 	color: $color4;
 }
@@ -98,6 +97,7 @@ popover {
 	}
 
 	calendar {
+		color: $color5;
 		// why tf is this needed ??
 		border-radius: 10px;
 		padding: 5px;
