@@ -1,13 +1,12 @@
 // gio's futures are not send, so ours can't be either
 #![allow(clippy::future_not_send)]
 
-use std::env;
-
 use gtk::{
     gdk::Display, glib, prelude::*, Align, Application, ApplicationWindow, CssProvider, Orientation,
 };
 use gtk4 as gtk;
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
+use std::env;
 use things::StopFuckingWithMyClockLayout;
 
 mod audio;
@@ -43,12 +42,6 @@ fn right_modules() -> gtk::Box {
         temperatures,
     } = psutil::Modules::new();
 
-    let battery_module = gtk::Box::new(Orientation::Horizontal, 0);
-    battery_module.set_widget_name("battery");
-    battery_module.add_css_class("module");
-    battery_module.append(&battery::new());
-    battery_module.append(&brigthness::new());
-
     let connectivity_module = gtk::Box::new(Orientation::Horizontal, 0);
     connectivity_module.set_widget_name("connectivity");
     connectivity_module.add_css_class("module");
@@ -61,7 +54,7 @@ fn right_modules() -> gtk::Box {
     modules.append(&temperatures);
     modules.append(&memory);
     modules.append(&cpu);
-    modules.append(&battery_module);
+    modules.append(&power::new());
     modules.append(&audio::new());
     modules.append(&powerbutton::new());
 
