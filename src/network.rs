@@ -1,7 +1,5 @@
 use crate::{rfkill, HasTooltip};
-use anyhow::Context;
-use futures::{future::Either, FutureExt, Stream, StreamExt, TryStream, TryStreamExt};
-use genetlink::GenetlinkHandle;
+use futures::TryStreamExt;
 use gtk::{
     glib::{self, clone},
     prelude::*,
@@ -9,18 +7,10 @@ use gtk::{
 };
 use gtk4 as gtk;
 use libc::RT_TABLE_MAIN;
-use netlink_packet_core::{ErrorMessage, NetlinkMessage, NLM_F_DUMP, NLM_F_REQUEST};
-use netlink_packet_generic::{GenlFamily, GenlHeader, GenlMessage};
 use netlink_packet_route::{
     address::AddressAttribute,
     link::{LinkAttribute, State},
     route::RouteAttribute,
-};
-use netlink_packet_utils::{
-    byteorder::{ByteOrder, NativeEndian},
-    nla::{DefaultNla, Nla, NlaBuffer, NlasIterator},
-    parsers::{parse_u16, parse_u32, parse_u64, parse_u8},
-    DecodeError, Emitable, Parseable, ParseableParametrized,
 };
 use rtnetlink::IpVersion;
 use std::{
@@ -29,7 +19,7 @@ use std::{
     rc::Rc,
     time::{Duration, SystemTime},
 };
-use wl_nl80211::Nl80211Attr;
+use wl_nl80211::{Nl80211Attr, Nl80211BssInfo, Nl80211InformationElements};
 
 #[derive(Debug)]
 struct Route {
@@ -338,7 +328,10 @@ async fn default_route(
         }
     }
 
-    let Some(bss) = nl80211_get_scan(wifi_handle, index)
+    let Some(bss) = wifi_handle
+        .scan()
+        .dump(index)
+        .execute()
         .await
         .try_collect::<Vec<_>>()
         .await
@@ -347,7 +340,7 @@ async fn default_route(
         .next()
         .and_then(|message| {
             message.payload.nlas.into_iter().find_map(|attr| {
-                if let CustomAttr::Bss(infos) = attr {
+                if let Nl80211Attr::Bss(infos) = attr {
                     Some(infos)
                 } else {
                     None
@@ -360,7 +353,7 @@ async fn default_route(
 
     for info in bss {
         match info {
-            BssInfo::SignalMbm(strength) => {
+            Nl80211BssInfo::SignalMbm(strength) => {
                 // convert mBm to dBm
                 let strength = strength as f64 / 100.;
 
@@ -379,9 +372,9 @@ async fn default_route(
 
                 route.signal_strength = Some(strength.round() as u32);
             }
-            BssInfo::InformationElements(elements) => {
+            Nl80211BssInfo::InformationElements(elements) => {
                 for element in elements {
-                    if let InformationElement::Ssid(ssid) = element {
+                    if let Nl80211InformationElements::Ssid(ssid) = element {
                         route.ssid = Some(ssid);
                     }
                 }
@@ -391,308 +384,4 @@ async fn default_route(
     }
 
     Some(route)
-}
-
-pub struct CustomHandle {
-    pub handle: GenetlinkHandle,
-}
-
-impl CustomHandle {
-    pub async fn request(
-        &mut self,
-        message: NetlinkMessage<GenlMessage<CustomMessage>>,
-    ) -> Result<
-        impl Stream<Item = Result<NetlinkMessage<GenlMessage<CustomMessage>>, DecodeError>>,
-        CustomError,
-    > {
-        self.handle
-            .request(message)
-            .await
-            .map_err(|e| CustomError::RequestFailed(format!("BUG: Request failed with {}", e)))
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Debug, thiserror::Error)]
-pub enum CustomError {
-    #[error("Received an unexpected message {0:?}")]
-    UnexpectedMessage(NetlinkMessage<GenlMessage<CustomMessage>>),
-
-    #[error("Received a netlink error message {0}")]
-    NetlinkError(ErrorMessage),
-
-    #[error("A netlink request failed")]
-    RequestFailed(String),
-
-    #[error("A bug in this crate")]
-    Bug(String),
-}
-
-macro_rules! try_nl80211 {
-    ($msg: expr) => {{
-        use netlink_packet_core::{NetlinkMessage, NetlinkPayload};
-
-        match $msg {
-            Ok(msg) => {
-                let (header, payload) = msg.into_parts();
-                match payload {
-                    NetlinkPayload::InnerMessage(msg) => msg,
-                    NetlinkPayload::Error(err) => return Err(CustomError::NetlinkError(err)),
-                    _ => {
-                        return Err(CustomError::UnexpectedMessage(NetlinkMessage::new(
-                            header, payload,
-                        )))
-                    }
-                }
-            }
-            Err(e) => return Err(CustomError::Bug(format!("BUG: decode error {:?}", e))),
-        }
-    }};
-}
-
-async fn nl80211_get_scan(
-    wifi_handle: &wl_nl80211::Nl80211Handle,
-    iface: u32,
-) -> impl TryStream<Ok = GenlMessage<CustomMessage>, Error = CustomError> {
-    let mut handle = CustomHandle {
-        handle: wifi_handle.handle.clone(),
-    };
-    let nl80211_msg = CustomMessage::new_scan_get(iface);
-    let mut nl_msg = NetlinkMessage::from(GenlMessage::from_payload(nl80211_msg));
-
-    nl_msg.header.flags = NLM_F_REQUEST | NLM_F_DUMP;
-
-    match handle.request(nl_msg).await {
-        Ok(response) => Either::Left(response.map(move |msg| Ok(try_nl80211!(msg)))),
-        Err(e) => Either::Right(
-            futures::future::err::<GenlMessage<CustomMessage>, CustomError>(e).into_stream(),
-        ),
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-struct CustomMessage {
-    pub cmd: u8,
-    pub nlas: Vec<CustomAttr>,
-}
-
-impl GenlFamily for CustomMessage {
-    fn family_name() -> &'static str {
-        "nl80211"
-    }
-
-    fn version(&self) -> u8 {
-        1
-    }
-
-    fn command(&self) -> u8 {
-        self.cmd
-    }
-}
-
-impl CustomMessage {
-    pub fn new_scan_get(iface: u32) -> Self {
-        let nlas = vec![CustomAttr::IfIndex(iface)];
-
-        Self { cmd: 32, nlas }
-    }
-}
-
-impl Emitable for CustomMessage {
-    fn buffer_len(&self) -> usize {
-        self.nlas.as_slice().buffer_len()
-    }
-
-    fn emit(&self, buffer: &mut [u8]) {
-        self.nlas.as_slice().emit(buffer)
-    }
-}
-
-fn parse_nlas(buffer: &[u8]) -> Result<Vec<CustomAttr>, DecodeError> {
-    let mut nlas = Vec::new();
-    for nla in NlasIterator::new(buffer) {
-        let error_msg = format!("Failed to parse nl80211 message attribute {:?}", nla);
-        let nla = &nla.context(error_msg.clone())?;
-        nlas.push(CustomAttr::parse(nla).context(error_msg)?);
-    }
-    Ok(nlas)
-}
-
-impl ParseableParametrized<[u8], GenlHeader> for CustomMessage {
-    fn parse_with_param(buffer: &[u8], header: GenlHeader) -> Result<Self, DecodeError> {
-        Ok(match header.cmd {
-            34 => Self {
-                cmd: 32,
-                nlas: parse_nlas(buffer)?,
-            },
-            cmd => {
-                return Err(DecodeError::from(format!(
-                    "Unsupported nl80211 reply command: {}",
-                    cmd
-                )));
-            }
-        })
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-enum CustomAttr {
-    IfIndex(u32),
-    Generation(u32),
-    Bss(Vec<BssInfo>),
-    Wdev(u64),
-}
-
-impl Nla for CustomAttr {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::IfIndex(_) => 4,
-            _ => todo!(),
-        }
-    }
-
-    fn kind(&self) -> u16 {
-        match self {
-            Self::IfIndex(_) => 3,
-            _ => todo!(),
-        }
-    }
-
-    fn emit_value(&self, buffer: &mut [u8]) {
-        match self {
-            Self::IfIndex(d) => NativeEndian::write_u32(buffer, *d),
-            _ => todo!(),
-        }
-    }
-}
-
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for CustomAttr {
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
-        let payload = buf.value();
-        Ok(match buf.kind() {
-            3 => {
-                let err_msg = format!("Invalid NL80211_ATTR_IFINDEX value {:?}", payload);
-                Self::IfIndex(parse_u32(payload).context(err_msg)?)
-            }
-            46 => {
-                let err_msg = format!("Invalid NL80211_ATTR_GENERATION value {:?}", payload);
-                Self::Generation(parse_u32(payload).context(err_msg)?)
-            }
-            47 => {
-                let err_msg = format!("Invalid NL80211_ATTR_STA_INFO value {:?}", payload);
-                let mut nlas = Vec::new();
-                for nla in NlasIterator::new(payload) {
-                    let nla = &nla.context(err_msg.clone())?;
-                    nlas.push(BssInfo::parse(nla).context(err_msg.clone())?);
-                }
-                Self::Bss(nlas)
-            }
-            153 => {
-                let err_msg = format!("Invalid NL80211_ATTR_WDEV value {:?}", payload);
-                Self::Wdev(parse_u64(payload).context(err_msg)?)
-            }
-            n => todo!("{:?}", n),
-        })
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-enum BssInfo {
-    // Bssid(hex),
-    Frequency(u32),
-    // Tsf(TSF),
-    BeaconInterval(u16),
-    // Capability(capability),
-    InformationElements(Vec<InformationElement>),
-    SignalMbm(i32),
-    SignalUnspec(u8),
-    Status(u32),
-    SeenMsAgo(u32),
-    // BeaconIes(elementsBinary),
-    ChanWidth(u32),
-    BeaconTsf(u64),
-    // PrespData(hex),
-    // Max(hex),
-    Other(DefaultNla),
-}
-
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for BssInfo {
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, netlink_packet_utils::DecodeError> {
-        let payload = buf.value();
-        Ok(match buf.kind() {
-            1 => Self::Other(DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?),
-            2 => {
-                let err_msg = format!("Invalid NL80211_ATTR_GENERATION value {:?}", payload);
-                Self::Frequency(parse_u32(payload).context(err_msg)?)
-            }
-            3 => Self::Other(DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?),
-            4 => {
-                let err_msg = format!("Invalid NL80211_ATTR_GENERATION value {:?}", payload);
-                Self::BeaconInterval(parse_u16(payload).context(err_msg)?)
-            }
-            5 => Self::Other(DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?),
-            6 => Self::InformationElements(InformationElement::parse_vec(buf).unwrap()),
-            7 => {
-                let err_msg = format!("Invalid NL80211_ATTR_GENERATION value {:?}", payload);
-                Self::SignalMbm(parse_u32(payload).context(err_msg)? as i32)
-            }
-            8 => {
-                let err_msg = format!("Invalid NL80211_ATTR_GENERATION value {:?}", payload);
-                Self::SignalUnspec(parse_u8(payload).context(err_msg)?)
-            }
-            9 => {
-                let err_msg = format!("Invalid NL80211_ATTR_GENERATION value {:?}", payload);
-                Self::Status(parse_u32(payload).context(err_msg)?)
-            }
-            10 => {
-                let err_msg = format!("Invalid NL80211_ATTR_GENERATION value {:?}", payload);
-                Self::SeenMsAgo(parse_u32(payload).context(err_msg)?)
-            }
-            11 => Self::Other(DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?),
-            12 => {
-                let err_msg = format!("Invalid NL80211_ATTR_GENERATION value {:?}", payload);
-                Self::ChanWidth(parse_u32(payload).context(err_msg)?)
-            }
-            13 => {
-                let err_msg = format!("Invalid NL80211_ATTR_GENERATION value {:?}", payload);
-                Self::BeaconTsf(parse_u64(payload).context(err_msg)?)
-            }
-            _ => Self::Other(DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?),
-        })
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-enum InformationElement {
-    Ssid(String),
-    Other(u8, Vec<u8>),
-}
-
-impl InformationElement {
-    fn parse_vec<T: AsRef<[u8]> + ?Sized>(
-        buf: &NlaBuffer<&T>,
-    ) -> Result<Vec<Self>, netlink_packet_utils::DecodeError> {
-        let mut result = Vec::new();
-        let payload = buf.value();
-
-        let mut offset = 0;
-
-        while offset < payload.len() {
-            let msg_type = parse_u8(&payload[offset..][..1]).unwrap();
-            let length = parse_u8(&payload[offset + 1..][..1]).unwrap() as usize;
-
-            match msg_type {
-                0 => result.push(Self::Ssid(
-                    String::from_utf8(payload[offset + 2..][..length].to_vec()).unwrap(),
-                )),
-                msg_type => result.push(Self::Other(
-                    msg_type,
-                    payload[offset + 2..][..length].to_owned(),
-                )),
-            }
-
-            offset += length + 2;
-        }
-
-        Ok(result)
-    }
 }

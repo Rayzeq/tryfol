@@ -2676,7 +2676,7 @@ dependencies = [
 [[package]]
 name = "wl-nl80211"
 version = "0.1.2"
-source = "git+https://github.com/rust-netlink/wl-nl80211.git#19d03a5a51ba8fd04965a747f91ed2c812eb0ba4"
+source = "git+https://github.com/Rayzeq/wl-nl80211.git?branch=scan#dc749626619a326025e6b2db31c86ccc30a37eed"
 dependencies = [
  "anyhow",
  "byteorder",

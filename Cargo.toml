@@ -23,7 +23,6 @@ udev = "0.8.0"
 wireplumber = { version = "0.2", features = ["v0_5", "futures", "libspa"], path = "../../Forks/wireplumber.rs" }
 futures = "0.3.28"
 dbusmenu-glib = { version = "0.1.0", path = "./dbusmenu-glib" }
-wl-nl80211 = { version = "0.1.2", git = "https://github.com/rust-netlink/wl-nl80211.git" }
 rtnetlink = "0.14.1"
 netlink-packet-route = "0.19.0"
 netlink-packet-generic = "0.3.3"
@@ -37,6 +36,10 @@ strum = { version = "0.26.2", features = ["derive"] }
 simple_logger = { version = "5.0.0", default-features = false, features = ["colors", "stderr"] }
 async-recursion = "1.1.1"
 paste = "1.0.15"
+
+[dependencies.wl-nl80211]
+git = "https://github.com/Rayzeq/wl-nl80211.git"
+branch = "scan"
 
 [dependencies.psutil]
 git = "https://github.com/Rayzeq/rust-psutil.git"
