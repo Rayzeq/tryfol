@@ -6,6 +6,7 @@ use futures::Stream;
 use std::io;
 use tokio::net::UnixStream;
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum Event {
     Workspace {

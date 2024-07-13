@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use super::proxy::{Category, ItemProxy, Orientation, Pixmap, Status};
 use crate::dbusmenu::DBusMenu;
 use anyhow::bail;
@@ -141,10 +143,7 @@ impl Item {
             scale,
         )
         .await
-        .and_then(|icon| {
-            icon.map(Result::Ok)
-                .unwrap_or_else(|| Self::get_default_icon(size, scale))
-        })
+        .and_then(|icon| icon.map_or_else(|| Self::get_default_icon(size, scale), Result::Ok))
     }
 
     pub async fn overlay_icon(&self, size: i32, scale: i32) -> anyhow::Result<Option<Paintable>> {
@@ -171,10 +170,7 @@ impl Item {
             scale,
         )
         .await
-        .and_then(|icon| {
-            icon.map(Result::Ok)
-                .unwrap_or_else(|| Self::get_default_icon(size, scale))
-        })
+        .and_then(|icon| icon.map_or_else(|| Self::get_default_icon(size, scale), Result::Ok))
     }
 
     // #[zbus(property(emits_changed_signal = "false"))]

@@ -18,6 +18,7 @@ struct RawWorkspace {
     name: String,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum Workspace {
     Regular { id: WorkspaceId, name: String },
