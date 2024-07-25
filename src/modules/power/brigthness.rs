@@ -38,8 +38,11 @@ pub fn new() -> Label {
 
     let device_cpy = device.clone();
     label.connect_vertical_scroll(move |_, dy| {
-        let device = device_cpy.clone();
+        let mut device = device_cpy.clone();
         glib::spawn_future_local(async move {
+            if let Err(e) = device.update() {
+                error!("Cannot update device: {e}");
+            }
             let current_brightness = match device.brightness() {
                 Ok(x) => x as f64,
                 Err(e) => {
@@ -111,6 +114,12 @@ impl Device {
             .scan_devices()?
             .map(|device| Self { inner: device })
             .collect())
+    }
+
+    /// Update the cached values for this device
+    pub fn update(&mut self) -> io::Result<()> {
+        self.inner = udev::Device::from_syspath(self.inner.syspath())?;
+        Ok(())
     }
 
     pub fn brightness(&self) -> anyhow::Result<u32> {
