@@ -1,5 +1,5 @@
 use crate::{
-    backend::status_notifier::{self, run_host, Event, Orientation, Status},
+    backend::status_notifier::{self, run_host, Category, Event, Orientation, Status},
     dbusmenu::DBusMenu,
     Clickable, HasTooltip, Scrollable,
 };
@@ -13,11 +13,11 @@ use gtk4::{
     Image, Overlay, Widget,
 };
 use log::error;
-use std::{cell::RefCell, collections::HashMap, convert::Infallible, rc::Rc};
+use std::{cell::RefCell, cmp::Ordering, collections::HashMap, convert::Infallible, rc::Rc};
 
 struct Host {
     root: gtk::Box,
-    items: HashMap<String, (Overlay, JoinHandle<()>)>,
+    items: HashMap<String, ItemDisplay>,
 }
 
 #[derive(Debug)]
@@ -33,6 +33,15 @@ struct Item {
     icon: Paintable,
     attention_icon: Paintable,
     menu: Rc<RefCell<Option<DBusMenu>>>,
+}
+
+struct ItemDisplay {
+    pub root: Overlay,
+    pub task: JoinHandle<()>,
+
+    // used to sort items
+    pub category: Category,
+    pub id: String,
 }
 
 pub fn new() -> gtk::Box {
@@ -62,7 +71,7 @@ pub fn new() -> gtk::Box {
 
 impl status_notifier::Host for Host {
     async fn item_registered(&mut self, id: &str, item: status_notifier::Item) {
-        let (item, task) = match Item::new(id.to_owned(), item).await {
+        let item = match Item::new(id.to_owned(), item).await {
             Ok(x) => x,
             Err(e) => {
                 error!("Error while handling new item: {e}");
@@ -70,20 +79,40 @@ impl status_notifier::Host for Host {
             }
         };
 
-        if let Some((old_item, old_task)) = self.items.insert(id.to_owned(), (item.clone(), task)) {
+        let old_item = self.items.insert(id.to_owned(), item);
+        let item = &self.items[id];
+
+        if let Some(old_item) = old_item {
             // replace the old child with the new one
-            self.root.insert_child_after(&item, Some(&old_item));
-            self.root.remove(&old_item);
-            old_task.abort();
+            self.root
+                .insert_child_after(&item.root, Some(&old_item.root));
+            self.root.remove(&old_item.root);
+            old_item.task.abort();
         } else {
-            self.root.append(&item);
+            let previous_item = self.get_previous_item(item);
+            self.root
+                .insert_child_after(&item.root, previous_item.map(|item| &item.root));
         }
     }
 
     async fn item_unregistered(&mut self, id: &str) {
-        if let Some((item, task)) = self.items.remove(id) {
-            self.root.remove(&item);
-            task.abort();
+        if let Some(item) = self.items.remove(id) {
+            self.root.remove(&item.root);
+            item.task.abort();
+        }
+    }
+}
+
+impl Host {
+    fn get_previous_item(&self, item: &ItemDisplay) -> Option<&ItemDisplay> {
+        let mut items: Vec<_> = self.items.values().collect();
+        items.sort();
+
+        let item_index = items.iter().position(|x| *x == item)?;
+        if item_index == 0 {
+            None
+        } else {
+            Some(items[item_index - 1])
         }
     }
 }
@@ -93,10 +122,7 @@ impl Item {
 
     /// Create an item, setup listeners, and returns the root widget.
     #[allow(clippy::new_ret_no_self)]
-    async fn new(
-        id: String,
-        item: status_notifier::Item,
-    ) -> anyhow::Result<(Overlay, JoinHandle<()>)> {
+    async fn new(id: String, item: status_notifier::Item) -> anyhow::Result<ItemDisplay> {
         let base = Image::builder().pixel_size(Self::SIZE).build();
         let overlay = Image::builder().pixel_size(Self::SIZE).build();
 
@@ -115,6 +141,12 @@ impl Item {
             .attention_icon(Self::SIZE, base.scale_factor())
             .await
             .context("While getting the initial attention icon")?;
+
+        let category = item
+            .category()
+            .await
+            .context("While getting the category")?;
+        let item_id = item.id().await.context("While getting the item id")?;
 
         let mut this = Self {
             root,
@@ -138,7 +170,12 @@ impl Item {
             }
         });
 
-        Ok((root, task))
+        Ok(ItemDisplay {
+            root,
+            task,
+            category,
+            id: item_id,
+        })
     }
 
     async fn setup(&mut self) -> anyhow::Result<()> {
@@ -330,5 +367,28 @@ impl Item {
             return Ok(());
         }
         item.context_menu(x, y).await.map_err(Into::into)
+    }
+}
+
+impl PartialEq for ItemDisplay {
+    fn eq(&self, other: &Self) -> bool {
+        self.category == other.category && self.id == other.id
+    }
+}
+
+impl Eq for ItemDisplay {}
+
+impl PartialOrd for ItemDisplay {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ItemDisplay {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.category.cmp(&other.category) {
+            x @ (Ordering::Greater | Ordering::Less) => x,
+            Ordering::Equal => self.id.cmp(&other.id),
+        }
     }
 }
