@@ -90,6 +90,13 @@ impl Workspace {
         let id = id.parse().context("Invalid workspace id")?;
         Ok(Self::from(id, name))
     }
+
+    pub fn id(&self) -> WorkspaceId {
+        match self {
+            Workspace::Regular { id, .. } => *id,
+            Workspace::Special { id, .. } => *id,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for Workspace {
