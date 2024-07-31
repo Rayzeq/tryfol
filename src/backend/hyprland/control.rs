@@ -30,6 +30,12 @@ pub async fn workspaces() -> anyhow::Result<Vec<WorkspaceInfos>> {
     serde_json::from_slice(&response).context("Invalid data while parsing workspaces infos")
 }
 
+#[doc(alias = "clients")]
+pub async fn windows() -> anyhow::Result<Vec<WindowInfos>> {
+    let response = raw_request(&['j'], "clients").await?;
+    serde_json::from_slice(&response).context("Invalid data while parsing windows infos")
+}
+
 // TODO: there are a lot of other ways to change workspaces
 pub async fn change_workspace(id: WorkspaceId) -> anyhow::Result<()> {
     dispatch(&("workspace ".to_owned() + &id.to_string())).await
