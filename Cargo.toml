@@ -29,6 +29,7 @@ async-stream = "0.3.5"
 strum = { version = "0.26.2", features = ["derive"] }
 simple_logger = { version = "5.0.0", default-features = false, features = ["colors", "stderr"] }
 async-recursion = "1.1.1"
+serde_repr = "0.1.19"
 
 [dependencies.wl-nl80211]
 git = "https://github.com/Rayzeq/wl-nl80211.git"

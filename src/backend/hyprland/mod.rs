@@ -1,7 +1,7 @@
 use anyhow::Context;
 use core::fmt::{self, Display};
-use serde::de::Error;
-use serde::Deserialize;
+use serde::{de::Error, Deserialize};
+use serde_repr::Deserialize_repr;
 use std::path::{Path, PathBuf};
 
 mod control;
@@ -50,9 +50,9 @@ pub struct WindowInfos {
     pub size: (i16, i16),
     pub workspace: Workspace,
     pub floating: bool,
-    pub fullscreen: bool,
-    #[serde(rename = "fullscreenMode")]
-    pub fullscreen_mode: i8,
+    pub fullscreen: FullscreenMode,
+    #[serde(rename = "fullscreenClient")]
+    pub fullscreen_client: FullscreenMode,
     pub monitor: MonitorId,
     #[serde(rename = "initialClass")]
     pub initial_class: String,
@@ -70,8 +70,15 @@ pub struct WindowInfos {
     #[serde(rename = "focusHistoryID")]
     pub focus_history_id: i8,
     pub hidden: bool,
-    #[serde(rename = "fakeFullscreen")]
-    pub fake_fullscreen: bool,
+}
+
+#[derive(Debug, Deserialize_repr)]
+#[repr(u8)]
+pub enum FullscreenMode {
+    None = 0,
+    Maximized = 1,
+    Fullscreen = 2,
+    MaximizedFullscreen = 3,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -91,10 +98,9 @@ impl Workspace {
         Ok(Self::from(id, name))
     }
 
-    pub fn id(&self) -> WorkspaceId {
+    pub const fn id(&self) -> WorkspaceId {
         match self {
-            Workspace::Regular { id, .. } => *id,
-            Workspace::Special { id, .. } => *id,
+            Self::Regular { id, .. } | Self::Special { id, .. } => *id,
         }
     }
 }

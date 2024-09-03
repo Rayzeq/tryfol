@@ -49,6 +49,7 @@ pub enum Event {
     Minimize,
     Screencast,
     WindowTitle,
+    WindowTitleV2,
     ToggleGroup,
     MoveIntoGroup,
     MoveOutOfGroup,
@@ -127,6 +128,7 @@ impl Event {
             "minimize" => Self::Minimize,
             "screencast" => Self::Screencast,
             "windowtitle" => Self::WindowTitle,
+            "windowtitlev2" => Self::WindowTitleV2,
             "togglegroup" => Self::ToggleGroup,
             "moveintogroup" => Self::MoveIntoGroup,
             "moveoutofgroup" => Self::MoveOutOfGroup,
@@ -134,7 +136,7 @@ impl Event {
             "lockgroups" => Self::LockGroups,
             "configreloaded" => Self::ConfigReloaded,
             "pin" => Self::Pin,
-            _ => anyhow::bail!("Unknown event"),
+            name => anyhow::bail!("Unknown event: {name}"),
         })
     }
 
