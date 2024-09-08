@@ -2,14 +2,15 @@ $color1: #66aced;
 $color2: #4fb9eb;
 $color3: #4ac6e2;
 $color4: #58d1d7;
-$color5: #73daca;
-$color6: #59d5f1;
-$color7: #7ec9ff;
-$color8: #bfb5ff;
-$color9: #f79aec;
-$color10: #fd8dce;
-$color11: #fd81af;
-$color12: #f7768e;
+$color5: #59d5f1;
+$color6: #7ec9ff;
+$color7: #bfb5ff;
+$color8: #f79aec;
+$color9: #fd8dce;
+$color10: #fd81af;
+$color11: #f7768e;
+
+$overlays-foreground: #73daca;
 
 @keyframes blink-warning {
 	from {
@@ -45,7 +46,7 @@ $color12: #f7768e;
 tooltip,
 popover {
 	background-color: rgba(0, 0, 0, 0.8);
-	color: $color4;
+	color: $overlays-foreground;
 }
 
 tooltip {
@@ -97,7 +98,7 @@ popover {
 	}
 
 	calendar {
-		color: $color5;
+		color: $color4;
 		// why tf is this needed ??
 		border-radius: 10px;
 		padding: 5px;
@@ -194,15 +195,15 @@ popover {
 }
 
 #clock {
-	color: $color5;
+	color: $color4;
 }
 
 #connectivity {
-	color: $color6;
+	color: $color5;
 }
 
 #temperatures {
-	color: $color7;
+	color: $color6;
 
 	.high {
 		color: red;
@@ -214,7 +215,7 @@ popover {
 }
 
 #memory {
-	color: $color8;
+	color: $color7;
 
 	&.warning {
 		color: orange;
@@ -226,7 +227,7 @@ popover {
 }
 
 #cpu {
-	color: $color9;
+	color: $color8;
 
 	.warning {
 		color: orange;
@@ -238,7 +239,7 @@ popover {
 }
 
 #battery {
-	color: $color10;
+	color: $color9;
 
 	.warning {
 		color: orange;
@@ -260,7 +261,7 @@ popover {
 }
 
 #audio {
-	color: $color11;
+	color: $color10;
 
 	label.muted {
 		color: red;
@@ -268,5 +269,5 @@ popover {
 }
 
 #power {
-	color: $color12;
+	color: $color11;
 }
