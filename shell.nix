@@ -13,6 +13,7 @@ pkgs.mkShell {
     llvmPackages_17.libclang
     udev
     libdbusmenu
+    openssl
   ];
   shellHook = ''
     export LIBCLANG_PATH="${pkgs.llvmPackages_17.libclang.lib}/lib"

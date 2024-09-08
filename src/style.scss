@@ -44,9 +44,14 @@ $overlays-foreground: #73daca;
 }
 
 tooltip,
-popover {
+popover,
+.mpris-controller {
 	background-color: rgba(0, 0, 0, 0.8);
 	color: $overlays-foreground;
+
+	&#players {
+		background-color: transparent;
+	}
 }
 
 tooltip {
@@ -54,8 +59,13 @@ tooltip {
 	padding: 3px 10px 5px 10px;
 }
 
-popover {
+popover,
+.mpris-controller {
 	border-radius: 10px;
+
+	&#players {
+		margin-top: 5px;
+	}
 
 	&.menu {
 		margin-top: 7px;
@@ -130,6 +140,67 @@ popover {
 
 		label.today {
 			background-color: rgba(255, 0, 255, 0.3);
+		}
+	}
+}
+
+.mpris-controller {
+	padding: 10px;
+
+	.cover {
+		border-radius: 5px;
+	}
+
+	.infos {
+		min-width: 150px;
+	}
+
+	.title {
+		font-weight: bold;
+	}
+
+	.artists {
+		font-style: italic;
+	}
+
+	.controls {
+		margin-left: 10px;
+		margin-right: 8px;
+
+		.primary {
+			font-size: 25px;
+		}
+
+		.secondary {
+			font-size: 22px;
+		}
+
+		button {
+			transition: text-shadow 0.4s;
+
+			&:hover {
+				transition: text-shadow 0.6s;
+				text-shadow: 0 0 15px, 0 0 15px;
+			}
+
+			&:disabled {
+				color: gray;
+			}
+		}
+	}
+
+	scale {
+		padding: 10px 0px;
+
+		trough {
+			border-radius: 2.5px;
+
+			min-height: 5px;
+			background-color: rgba(50, 50, 50, 0.8);
+
+			highlight {
+				background-color: $overlays-foreground;
+			}
 		}
 	}
 }
