@@ -63,12 +63,20 @@ pub fn new() -> gtk::Box {
     });
 
     let event_controller = EventControllerMotion::new();
-    event_controller.connect_enter(clone!(@strong revealer => move |_, _, _| {
-        revealer.set_reveal_child(true);
-    }));
-    event_controller.connect_leave(clone!(@strong revealer => move |_| {
-        revealer.set_reveal_child(false);
-    }));
+    event_controller.connect_enter(clone!(
+        #[strong]
+        revealer,
+        move |_, _, _| {
+            revealer.set_reveal_child(true);
+        }
+    ));
+    event_controller.connect_leave(clone!(
+        #[strong]
+        revealer,
+        move |_| {
+            revealer.set_reveal_child(false);
+        }
+    ));
     container.add_controller(event_controller);
 
     glib::spawn_future_local(run_manager(label, connected_devices, devices));
@@ -190,30 +198,56 @@ where
     .await
     .unwrap();
     let mut events = properties_proxy.receive_properties_changed().await.unwrap();
-    let task = glib::spawn_future_local(
-        clone!(@strong global_label, @strong connected_devices, @strong devices, @strong widget, @strong device => async move {
+    let task = glib::spawn_future_local(clone!(
+        #[strong]
+        global_label,
+        #[strong]
+        connected_devices,
+        #[strong]
+        devices,
+        #[strong]
+        widget,
+        #[strong]
+        device,
+        async move {
             while let Some(_event) = events.next().await {
-                update_device(&global_label, &connected_devices, &devices, &device, &widget, &mut is_connected).await;
+                update_device(
+                    &global_label,
+                    &connected_devices,
+                    &devices,
+                    &device,
+                    &widget,
+                    &mut is_connected,
+                )
+                .await;
             }
-        }),
-    );
+        }
+    ));
     // todo: is it needed ?
     std::mem::forget(properties_proxy);
     widget.connect_destroy(move |_| task.abort());
 
     let gesture = gtk::GestureClick::new();
     gesture.set_button(gdk::BUTTON_PRIMARY);
-    gesture.connect_released(clone!(@strong device => move |_, n_press, _, _| {
-        glib::spawn_future_local(clone!(@strong device => async move {
-            if n_press == 2 {
-                if device.Connected().await.unwrap() {
-                    device.Disconnect().await.unwrap();
-                } else {
-                    device.Connect().await.unwrap();
+    gesture.connect_released(clone!(
+        #[strong]
+        device,
+        move |_, n_press, _, _| {
+            glib::spawn_future_local(clone!(
+                #[strong]
+                device,
+                async move {
+                    if n_press == 2 {
+                        if device.Connected().await.unwrap() {
+                            device.Disconnect().await.unwrap();
+                        } else {
+                            device.Connect().await.unwrap();
+                        }
+                    }
                 }
-            }
-        }));
-    }));
+            ));
+        }
+    ));
     widget.add_controller(gesture);
 
     // let gesture = gtk::GestureClick::new();

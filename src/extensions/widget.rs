@@ -77,12 +77,20 @@ where
         F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, bool) + 'static + Clone,
     {
         let motion_controller = EventControllerMotion::new();
-        motion_controller.connect_enter(
-            clone!(@weak self as this, @strong callback => move |_, _, _|  callback(&this, true)),
-        );
-        motion_controller.connect_leave(clone!(@weak self as this => move |_| {
-            callback(&this, false);
-        }));
+        motion_controller.connect_enter(clone!(
+            #[weak(rename_to = this)]
+            self,
+            #[strong]
+            callback,
+            move |_, _, _| callback(&this, true)
+        ));
+        motion_controller.connect_leave(clone!(
+            #[weak(rename_to = this)]
+            self,
+            move |_| {
+                callback(&this, false);
+            }
+        ));
         self.add_controller(motion_controller);
     }
 }
@@ -97,13 +105,14 @@ where
         F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, i32, f64, f64) + 'static,
     {
         let gesture_controller = GestureClick::builder().button(button).build();
-        gesture_controller.connect_pressed(
-            clone!(@weak self as this => move |gesture, press_count, x, y| {
+        gesture_controller.connect_pressed(clone!(
+            #[weak(rename_to = this)]
+            self,
+            move |gesture, press_count, x, y| {
                 gesture.set_state(EventSequenceState::Claimed);
                 callback(&this, press_count, x, y);
-
-            }),
-        );
+            }
+        ));
         self.add_controller(gesture_controller);
     }
 
@@ -139,12 +148,16 @@ where
         F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, f64) + 'static,
     {
         let scroll_controller = EventControllerScroll::new(EventControllerScrollFlags::HORIZONTAL);
-        scroll_controller.connect_scroll(
-            clone!(@weak self as this => @default-return Propagation::Proceed, move |_, dx, _| {
+        scroll_controller.connect_scroll(clone!(
+            #[weak(rename_to = this)]
+            self,
+            #[upgrade_or]
+            Propagation::Proceed,
+            move |_, dx, _| {
                 callback(&this, dx);
                 Propagation::Stop
-            }),
-        );
+            }
+        ));
         self.add_controller(scroll_controller);
     }
 
@@ -153,12 +166,16 @@ where
         F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, f64) + 'static,
     {
         let scroll_controller = EventControllerScroll::new(EventControllerScrollFlags::VERTICAL);
-        scroll_controller.connect_scroll(
-            clone!(@weak self as this => @default-return Propagation::Proceed, move |_, _, dy| {
+        scroll_controller.connect_scroll(clone!(
+            #[weak(rename_to = this)]
+            self,
+            #[upgrade_or]
+            Propagation::Proceed,
+            move |_, _, dy| {
                 callback(&this, dy);
                 Propagation::Stop
-            }),
-        );
+            }
+        ));
         self.add_controller(scroll_controller);
     }
 
@@ -167,12 +184,16 @@ where
         F: for<'a> Fn(&'a <W::Weak as Upgrade>::Strong, f64, f64) + 'static,
     {
         let scroll_controller = EventControllerScroll::new(EventControllerScrollFlags::BOTH_AXES);
-        scroll_controller.connect_scroll(
-            clone!(@weak self as this => @default-return Propagation::Proceed, move |_, dx, dy| {
+        scroll_controller.connect_scroll(clone!(
+            #[weak(rename_to = this)]
+            self,
+            #[upgrade_or]
+            Propagation::Proceed,
+            move |_, dx, dy| {
                 callback(&this, dx, dy);
                 Propagation::Stop
-            }),
-        );
+            }
+        ));
         self.add_controller(scroll_controller);
     }
 }

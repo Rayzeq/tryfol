@@ -72,14 +72,22 @@ pub fn new() -> gtk::Box {
     let connected2 = Rc::clone(&connected);
 
     let event_controller = EventControllerMotion::new();
-    event_controller.connect_enter(clone!(@strong revealer => move |_, _, _| {
-        if connected.get() {
-            revealer.set_reveal_child(true);
+    event_controller.connect_enter(clone!(
+        #[strong]
+        revealer,
+        move |_, _, _| {
+            if connected.get() {
+                revealer.set_reveal_child(true);
+            }
         }
-    }));
-    event_controller.connect_leave(clone!(@strong revealer => move |_| {
-        revealer.set_reveal_child(false);
-    }));
+    ));
+    event_controller.connect_leave(clone!(
+        #[strong]
+        revealer,
+        move |_| {
+            revealer.set_reveal_child(false);
+        }
+    ));
     container.add_controller(event_controller);
 
     let (connection, route_handle, _) = rtnetlink::new_connection().unwrap();

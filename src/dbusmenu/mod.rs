@@ -41,11 +41,15 @@ impl DBusMenu {
             action_group,
         };
 
-        client.connect_layout_updated(clone!(@strong this => move |client| {
-            if let Some(root) = client.root() {
-                this.rebuild(&root);
+        client.connect_layout_updated(clone!(
+            #[strong]
+            this,
+            move |client| {
+                if let Some(root) = client.root() {
+                    this.rebuild(&root);
+                }
             }
-        }));
+        ));
 
         this
     }
@@ -136,9 +140,13 @@ impl DBusMenu {
                 }
 
                 let action = SimpleAction::new(&dbus_item.id().to_string(), None);
-                action.connect_activate(clone!(@strong dbus_item => move |_, _| {
-                    dbus_item.handle_event("clicked", &0.into(), gdk::CURRENT_TIME);
-                }));
+                action.connect_activate(clone!(
+                    #[strong]
+                    dbus_item,
+                    move |_, _| {
+                        dbus_item.handle_event("clicked", &0.into(), gdk::CURRENT_TIME);
+                    }
+                ));
                 self.action_group.add_action(&action);
                 item.set_action_and_target_value(Some(&format!("menu.{}", dbus_item.id())), None);
 

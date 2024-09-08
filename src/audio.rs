@@ -1,13 +1,17 @@
 use crate::HasTooltip;
-use gtk::{
-    glib::{self, clone, prelude::ObjectExt, Propagation, Value, Variant, VariantDict},
-    prelude::*,
+use gtk4::{
+    self as gtk,
+    glib::{self, clone, Propagation},
+    prelude::{BoxExt, ButtonExt, WidgetExt},
     Button, EventControllerScroll, EventControllerScrollFlags, Label, Orientation,
 };
-use gtk4 as gtk;
 use std::borrow::Cow;
 use wireplumber::{
     core::ObjectFeatures,
+    lib::glib::{
+        prelude::{IsA, ObjectExt},
+        Value, Variant, VariantDict,
+    },
     plugin::{Plugin, PluginFeatures},
     prelude::*,
     pw::{Device, GlobalProxy, Node},
@@ -79,34 +83,84 @@ pub fn new() -> gtk::Box {
         def_nodes_api.connect_local(
             "changed",
             true,
-            clone!(@strong def_nodes_api, @strong manager, @strong mixer_api, @strong input_label, @strong output_label => move |_| {
-                glib::spawn_future_local(clone!(@strong def_nodes_api, @strong manager, @strong mixer_api, @strong input_label, @strong output_label => async move {
-                    refresh(
-                        &def_nodes_api,
-                        &mixer_api,
-                        &manager,
-                        &input_label,
-                        &output_label,
-                    ).await;
-                }));
-                None
-            }),
+            clone!(
+                #[strong]
+                def_nodes_api,
+                #[strong]
+                manager,
+                #[strong]
+                mixer_api,
+                #[strong]
+                input_label,
+                #[strong]
+                output_label,
+                move |_| {
+                    glib::spawn_future_local(clone!(
+                        #[strong]
+                        def_nodes_api,
+                        #[strong]
+                        manager,
+                        #[strong]
+                        mixer_api,
+                        #[strong]
+                        input_label,
+                        #[strong]
+                        output_label,
+                        async move {
+                            refresh(
+                                &def_nodes_api,
+                                &mixer_api,
+                                &manager,
+                                &input_label,
+                                &output_label,
+                            )
+                            .await;
+                        }
+                    ));
+                    None
+                }
+            ),
         );
         mixer_api.connect_local(
             "changed",
             true,
-            clone!(@strong def_nodes_api, @strong manager, @strong mixer_api, @strong input_label, @strong output_label => move |_| {
-                glib::spawn_future_local(clone!(@strong def_nodes_api, @strong manager, @strong mixer_api, @strong input_label, @strong output_label => async move {
-                    refresh(
-                        &def_nodes_api,
-                        &mixer_api,
-                        &manager,
-                        &input_label,
-                        &output_label,
-                    ).await;
-                }));
-                None
-            }),
+            clone!(
+                #[strong]
+                def_nodes_api,
+                #[strong]
+                manager,
+                #[strong]
+                mixer_api,
+                #[strong]
+                input_label,
+                #[strong]
+                output_label,
+                move |_| {
+                    glib::spawn_future_local(clone!(
+                        #[strong]
+                        def_nodes_api,
+                        #[strong]
+                        manager,
+                        #[strong]
+                        mixer_api,
+                        #[strong]
+                        input_label,
+                        #[strong]
+                        output_label,
+                        async move {
+                            refresh(
+                                &def_nodes_api,
+                                &mixer_api,
+                                &manager,
+                                &input_label,
+                                &output_label,
+                            )
+                            .await;
+                        }
+                    ));
+                    None
+                }
+            ),
         );
 
         def_nodes_api
@@ -130,40 +184,64 @@ pub fn new() -> gtk::Box {
         )
         .await;
 
-        input.connect_clicked(
-            clone!(@strong manager, @strong def_nodes_api, @strong mixer_api => move |_| {
+        input.connect_clicked(clone!(
+            #[strong]
+            manager,
+            #[strong]
+            def_nodes_api,
+            #[strong]
+            mixer_api,
+            move |_| {
                 if let Some(input) = get_default_input(&def_nodes_api, &manager) {
                     toggle_mute(&mixer_api, &input);
                 }
-            }),
-        );
+            }
+        ));
         let scroll_detector = EventControllerScroll::new(EventControllerScrollFlags::VERTICAL);
-        scroll_detector.connect_scroll(
-            clone!(@strong manager, @strong def_nodes_api, @strong mixer_api => move |_, _, dy| {
+        scroll_detector.connect_scroll(clone!(
+            #[strong]
+            manager,
+            #[strong]
+            def_nodes_api,
+            #[strong]
+            mixer_api,
+            move |_, _, dy| {
                 if let Some(input) = get_default_input(&def_nodes_api, &manager) {
                     change_volume(&mixer_api, &input, -dy);
                 }
                 Propagation::Proceed
-            }),
-        );
+            }
+        ));
         input.add_controller(scroll_detector);
 
-        output.connect_clicked(
-            clone!(@strong manager, @strong def_nodes_api, @strong mixer_api => move |_| {
+        output.connect_clicked(clone!(
+            #[strong]
+            manager,
+            #[strong]
+            def_nodes_api,
+            #[strong]
+            mixer_api,
+            move |_| {
                 if let Some(output) = get_default_output(&def_nodes_api, &manager) {
                     toggle_mute(&mixer_api, &output);
                 }
-            }),
-        );
+            }
+        ));
         let scroll_detector = EventControllerScroll::new(EventControllerScrollFlags::VERTICAL);
-        scroll_detector.connect_scroll(
-            clone!(@strong manager, @strong def_nodes_api, @strong mixer_api => move |_, _, dy| {
+        scroll_detector.connect_scroll(clone!(
+            #[strong]
+            manager,
+            #[strong]
+            def_nodes_api,
+            #[strong]
+            mixer_api,
+            move |_, _, dy| {
                 if let Some(output) = get_default_output(&def_nodes_api, &manager) {
                     change_volume(&mixer_api, &output, -dy);
                 }
                 Propagation::Proceed
-            }),
-        );
+            }
+        ));
         output.add_controller(scroll_detector);
 
         // leak core to allow signals to still work

@@ -185,73 +185,107 @@ impl Item {
         self.overlay_icon_changed().await;
         self.menu_changed().await;
 
-        self.root.connect_left_clicked(
-            clone!(@strong self.item as item, @strong self.menu as menu => move |_, _, x, y| {
-                glib::spawn_future_local(clone!(@strong item, @strong menu => async move {
-                    #[allow(clippy::cast_possible_truncation)]
-                    let (x, y) = (x as i32, y as i32);
-                    let item_is_menu = match item.item_is_menu().await {
-                        Ok(x) => x,
-                        Err(e) => {
-                            error!("Cannot check whether item is a menu: {e}");
-                            false
-                        }
-                    };
-
-                    let result = if item_is_menu {
-                        Self::popup_menu(item, menu, x, y).await
-                    } else {
-                        match item.activate(x, y).await {
-                            Ok(true) => Ok(()),
-                            Ok(false) => Self::popup_menu(item, menu, x, y).await,
-                            Err(e) => Err(e)
-                        }
-                    };
-                    if let Err(e) = result {
-                        error!("Error while handling left click: {e}");
-                    }
-                }));
-            }),
-        );
-
-        self.root
-            .connect_middle_clicked(clone!(@strong self.item as item => move |_, _, x, y| {
-                glib::spawn_future_local(clone!(@strong item => async move {
-                    #[allow(clippy::cast_possible_truncation)]
-                    if let Err(e) = item.secondary_activate(x as i32, y as i32).await {
-                        error!("Error while handling middle click: {e}");
-                    }
-                }));
-            }));
-
-        self.root.connect_right_clicked(
-            clone!(@strong self.item as item, @strong self.menu as menu => move |_, _, x, y| {
-                glib::spawn_future_local(clone!(@strong item, @strong menu => async move {
-                    #[allow(clippy::cast_possible_truncation)]
-                    if let Err(e) = Self::popup_menu(item, menu, x as i32, y as i32).await {
-                        error!("Error while handling right click: {e}");
-                    }
-                }));
-            }),
-        );
-
-        self.root
-            .connect_both_scroll(clone!(@strong self.item as item => move |_, dx, dy| {
-                glib::spawn_future_local(clone!(@strong item => async move {
-                    if dx != 0. {
+        self.root.connect_left_clicked(clone!(
+            #[strong(rename_to = item)]
+            self.item,
+            #[strong(rename_to = menu)]
+            self.menu,
+            move |_, _, x, y| {
+                glib::spawn_future_local(clone!(
+                    #[strong]
+                    item,
+                    #[strong]
+                    menu,
+                    async move {
                         #[allow(clippy::cast_possible_truncation)]
-                        if let Err(e) = item.scroll(dx as i32, Orientation::Horizontal).await {
-                            error!("Error while handling scroll event: {e}");
+                        let (x, y) = (x as i32, y as i32);
+                        let item_is_menu = match item.item_is_menu().await {
+                            Ok(x) => x,
+                            Err(e) => {
+                                error!("Cannot check whether item is a menu: {e}");
+                                false
+                            }
+                        };
+
+                        let result = if item_is_menu {
+                            Self::popup_menu(item, menu, x, y).await
+                        } else {
+                            match item.activate(x, y).await {
+                                Ok(true) => Ok(()),
+                                Ok(false) => Self::popup_menu(item, menu, x, y).await,
+                                Err(e) => Err(e),
+                            }
+                        };
+                        if let Err(e) = result {
+                            error!("Error while handling left click: {e}");
                         }
                     }
-                    if dy != 0. {
+                ));
+            }
+        ));
+
+        self.root.connect_middle_clicked(clone!(
+            #[strong(rename_to = item)]
+            self.item,
+            move |_, _, x, y| {
+                glib::spawn_future_local(clone!(
+                    #[strong]
+                    item,
+                    async move {
                         #[allow(clippy::cast_possible_truncation)]
-                        if let Err(e) = item.scroll(dy as i32, Orientation::Vertical).await {
-                            error!("Error while handling scroll event: {e}");
+                        if let Err(e) = item.secondary_activate(x as i32, y as i32).await {
+                            error!("Error while handling middle click: {e}");
                         }
                     }
-                }));
-            }));
+                ));
+            }
+        ));
+
+        self.root.connect_right_clicked(clone!(
+            #[strong(rename_to = item)]
+            self.item,
+            #[strong(rename_to = menu)]
+            self.menu,
+            move |_, _, x, y| {
+                glib::spawn_future_local(clone!(
+                    #[strong]
+                    item,
+                    #[strong]
+                    menu,
+                    async move {
+                        #[allow(clippy::cast_possible_truncation)]
+                        if let Err(e) = Self::popup_menu(item, menu, x as i32, y as i32).await {
+                            error!("Error while handling right click: {e}");
+                        }
+                    }
+                ));
+            }
+        ));
+
+        self.root.connect_both_scroll(clone!(
+            #[strong(rename_to = item)]
+            self.item,
+            move |_, dx, dy| {
+                glib::spawn_future_local(clone!(
+                    #[strong]
+                    item,
+                    async move {
+                        if dx != 0. {
+                            #[allow(clippy::cast_possible_truncation)]
+                            if let Err(e) = item.scroll(dx as i32, Orientation::Horizontal).await {
+                                error!("Error while handling scroll event: {e}");
+                            }
+                        }
+                        if dy != 0. {
+                            #[allow(clippy::cast_possible_truncation)]
+                            if let Err(e) = item.scroll(dy as i32, Orientation::Vertical).await {
+                                error!("Error while handling scroll event: {e}");
+                            }
+                        }
+                    }
+                ));
+            }
+        ));
 
         Ok(())
     }

@@ -74,11 +74,15 @@ pub fn new() -> Label {
         });
     });
 
-    let task = Device::connect_on_update(clone!(@weak label => move |updated_device| {
-        if updated_device == device {
-            update(&updated_device, &label);
+    let task = Device::connect_on_update(clone!(
+        #[weak]
+        label,
+        move |updated_device| {
+            if updated_device == device {
+                update(&updated_device, &label);
+            }
         }
-    }));
+    ));
     label.connect_destroy(move |_| task.abort());
 
     label

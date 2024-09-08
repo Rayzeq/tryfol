@@ -11,8 +11,8 @@ tokio = { version = "1.36.0", features = ["full"] }
 zbus = { version = "4.2.2", default-features = false, features = ["tokio"] }
 chrono = { version = "0.4.38", features = ["unstable-locales"] }
 grass = "0.13.2"
-gtk4 = { version = "0.8.2", features = ["v4_14"] }
-gtk4-layer-shell = "0.3.0"
+gtk4 = { version = "0.9.1", features = ["v4_14"] }
+gtk4-layer-shell = "0.4.0"
 html-escape = "0.2.13"
 lazy_static = "1.4.0"
 libc = "0.2.153"
