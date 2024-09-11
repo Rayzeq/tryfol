@@ -1,4 +1,4 @@
-use crate::{rfkill, HasTooltip};
+use crate::{backend::rfkill, HasTooltip};
 use futures::TryStreamExt;
 use gtk::{
     glib::{self, clone},
@@ -7,6 +7,7 @@ use gtk::{
 };
 use gtk4 as gtk;
 use libc::RT_TABLE_MAIN;
+use log::error;
 use netlink_packet_route::{
     address::AddressAttribute,
     link::{LinkAttribute, State},
@@ -159,11 +160,27 @@ async fn update(
             ("󰈁", format!("{iname}: {}", address.unwrap()))
         }
         None => {
-            let wkill = rfkill::list()
-                .into_iter()
-                .find(|event| event.r#type == rfkill::Type::Wlan)
-                .unwrap();
-            if wkill.soft || wkill.hard {
+            let rfkill_state = rfkill::MANAGER
+                .with(|m| {
+                    glib::spawn_future_local(clone!(
+                        #[strong]
+                        m,
+                        async move { m.state().await }
+                    ))
+                })
+                .await;
+            let wkill = match rfkill_state {
+                Ok(x) => x
+                    .iter()
+                    .find(|(_, (r#type, _))| *r#type == rfkill::Type::Wlan)
+                    .map_or(true, |(_, (_, state))| *state),
+                Err(e) => {
+                    error!("Cannot get rfkill state: {e}");
+                    false
+                }
+            };
+
+            if wkill {
                 ("󰖪", "Wifi: Disabled\nEthernet: Not detected".to_owned())
             } else {
                 ("󰤯", "Wifi: Disconnected\nEthernet: Not detected".to_owned())

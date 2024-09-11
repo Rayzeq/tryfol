@@ -16,7 +16,6 @@ mod dbusmenu;
 mod extensions;
 mod modules;
 mod network;
-mod rfkill;
 mod things;
 pub use extensions::*;
 
