@@ -342,12 +342,17 @@ async fn default_route(
         .await
         .unwrap()
         .into_iter()
-        .find(|message| message.payload.nlas.contains(&Nl80211Attr::IfIndex(index)))
+        .find(|message| {
+            message
+                .payload
+                .attributes
+                .contains(&Nl80211Attr::IfIndex(index))
+        })
     else {
         return Some(route);
     };
 
-    for attr in interface.payload.nlas {
+    for attr in interface.payload.attributes {
         if let Nl80211Attr::Ssid(ssid) = attr {
             route.ssid = Some(ssid);
         }
@@ -364,7 +369,7 @@ async fn default_route(
         .into_iter()
         .next()
         .and_then(|message| {
-            message.payload.nlas.into_iter().find_map(|attr| {
+            message.payload.attributes.into_iter().find_map(|attr| {
                 if let Nl80211Attr::Bss(infos) = attr {
                     Some(infos)
                 } else {
