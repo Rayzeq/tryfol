@@ -3,7 +3,12 @@ use crate::{
     HasTooltip, Japanese,
 };
 use futures::{pin_mut, StreamExt};
-use gtk::{glib, pango::EllipsizeMode, prelude::*, Button, Label};
+use gtk::{
+    glib::{self, clone},
+    pango::EllipsizeMode,
+    prelude::*,
+    Button, Label,
+};
 use gtk4 as gtk;
 use lazy_static::lazy_static;
 use log::error;
@@ -160,12 +165,22 @@ impl ModulesInner {
 
     fn add_workspace(&mut self, id: WorkspaceId) {
         let button = Button::with_label(&id.to_japanese());
-        button.connect_clicked(move |_| {
-            glib::spawn_future_local(async move {
-                if let Err(e) = hyprland::change_workspace(id as WorkspaceId).await {
-                    error!("Failed to change workspace: {e:?}");
-                }
-            });
+        button.connect_clicked(move |this| {
+            glib::spawn_future_local(clone!(
+                #[strong]
+                this,
+                async move {
+                    // trying to switch to the current workspace is an error (depending
+                    // on your config)
+                    if this.has_css_class("active") {
+                        return;
+                    }
+
+                    if let Err(e) = hyprland::change_workspace(id as WorkspaceId).await {
+                        error!("Failed to change workspace: {e:?}");
+                    }
+                },
+            ));
         });
 
         let previous = self
