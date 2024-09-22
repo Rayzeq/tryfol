@@ -2,6 +2,11 @@
 name = "tryfol"
 version = "0.1.0"
 edition = "2021"
+description = "A custom Wayland bar written in Rust + GTK4"
+license = "MPL-2.0"
+repository = "https://github.com/Rayzeq/tryfol"
+keywords = [ "wayland", "gtk4", "status-bar" ]
+categories = [ "os", "gui" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
