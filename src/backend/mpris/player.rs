@@ -48,6 +48,9 @@ impl Player {
             Ok(x) => Ok(Some(x)),
             // No such property “LoopStatus”
             Err(zbus::Error::FDO(e)) if matches!(*e, zbus::fdo::Error::InvalidArgs(_)) => Ok(None),
+            Err(zbus::Error::FDO(e)) if matches!(*e, zbus::fdo::Error::UnknownProperty(_)) => {
+                Ok(None)
+            }
             Err(e) => Err(e),
         }
     }
@@ -61,6 +64,9 @@ impl Player {
             Ok(x) => Ok(Some(x)),
             // No such property “Shuffle”
             Err(zbus::Error::FDO(e)) if matches!(*e, zbus::fdo::Error::InvalidArgs(_)) => Ok(None),
+            Err(zbus::Error::FDO(e)) if matches!(*e, zbus::fdo::Error::UnknownProperty(_)) => {
+                Ok(None)
+            }
             Err(e) => Err(e),
         }
     }
