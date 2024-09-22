@@ -20,7 +20,7 @@ use std::{
     rc::Rc,
     time::{Duration, SystemTime},
 };
-use wl_nl80211::{Nl80211Attr, Nl80211BssInfo, Nl80211InformationElements};
+use wl_nl80211::{Nl80211Attr, Nl80211BssInfo, Nl80211Element};
 
 #[derive(Debug)]
 struct Route {
@@ -404,7 +404,7 @@ async fn default_route(
             }
             Nl80211BssInfo::InformationElements(elements) => {
                 for element in elements {
-                    if let Nl80211InformationElements::Ssid(ssid) = element {
+                    if let Nl80211Element::Ssid(ssid) = element {
                         route.ssid = Some(ssid);
                     }
                 }

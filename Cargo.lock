@@ -391,7 +391,7 @@ checksum = "428290f914b9b86089f60f5d8a9f6e440508e1bcff23b25afd51502b0a2da88f"
 dependencies = [
  "glib-sys 0.20.2",
  "libc",
- "system-deps 7.0.2",
+ "system-deps 7.0.3",
 ]
 
 [[package]]
@@ -424,9 +424,9 @@ dependencies = [
 
 [[package]]
 name = "cfg-expr"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "345c78335be0624ed29012dc10c49102196c6882c12dde65d9f35b02da2aada8"
+checksum = "d0890061c4d3223e7267f3bad2ec40b997d64faac1c2815a4a9d95018e2b9e9c"
 dependencies = [
  "smallvec",
  "target-lexicon",
@@ -865,7 +865,7 @@ dependencies = [
  "glib-sys 0.20.2",
  "gobject-sys 0.20.1",
  "libc",
- "system-deps 7.0.2",
+ "system-deps 7.0.3",
 ]
 
 [[package]]
@@ -898,7 +898,7 @@ dependencies = [
  "libc",
  "pango-sys",
  "pkg-config",
- "system-deps 7.0.2",
+ "system-deps 7.0.3",
 ]
 
 [[package]]
@@ -1002,7 +1002,7 @@ dependencies = [
  "glib-sys 0.20.2",
  "gobject-sys 0.20.1",
  "libc",
- "system-deps 7.0.2",
+ "system-deps 7.0.3",
  "windows-sys 0.52.0",
 ]
 
@@ -1123,7 +1123,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92eee4531c1c9abba945d19378b205031b5890e1f99c319ba0503b6e0c06a163"
 dependencies = [
  "libc",
- "system-deps 7.0.2",
+ "system-deps 7.0.3",
 ]
 
 [[package]]
@@ -1151,7 +1151,7 @@ checksum = "fa3d1dcd8a1eb2e7c22be3d5e792b14b186f3524f79b25631730f9a8c169d49a"
 dependencies = [
  "glib-sys 0.20.2",
  "libc",
- "system-deps 7.0.2",
+ "system-deps 7.0.3",
 ]
 
 [[package]]
@@ -1174,7 +1174,7 @@ dependencies = [
  "glib-sys 0.20.2",
  "libc",
  "pkg-config",
- "system-deps 7.0.2",
+ "system-deps 7.0.3",
 ]
 
 [[package]]
@@ -1230,7 +1230,7 @@ dependencies = [
  "graphene-sys",
  "libc",
  "pango-sys",
- "system-deps 7.0.2",
+ "system-deps 7.0.3",
 ]
 
 [[package]]
@@ -1279,7 +1279,7 @@ dependencies = [
  "glib-sys 0.20.2",
  "gtk4-sys",
  "libc",
- "system-deps 7.0.2",
+ "system-deps 7.0.3",
 ]
 
 [[package]]
@@ -1310,7 +1310,7 @@ dependencies = [
  "gsk4-sys",
  "libc",
  "pango-sys",
- "system-deps 7.0.2",
+ "system-deps 7.0.3",
 ]
 
 [[package]]
@@ -1986,7 +1986,7 @@ dependencies = [
  "glib-sys 0.20.2",
  "gobject-sys 0.20.1",
  "libc",
- "system-deps 7.0.2",
+ "system-deps 7.0.3",
 ]
 
 [[package]]
@@ -2711,11 +2711,11 @@ dependencies = [
 
 [[package]]
 name = "system-deps"
-version = "7.0.2"
+version = "7.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "070a0a5e7da2d24be457809c4b3baa57a835fd2829ad8b86f9a049052fe71031"
+checksum = "66d23aaf9f331227789a99e8de4c91bf46703add012bdfd45fdecdfb2975a005"
 dependencies = [
- "cfg-expr 0.16.0",
+ "cfg-expr 0.17.0",
  "heck",
  "pkg-config",
  "toml",
@@ -3427,7 +3427,7 @@ dependencies = [
 [[package]]
 name = "wl-nl80211"
 version = "0.2.0"
-source = "git+https://github.com/Rayzeq/wl-nl80211.git?branch=scan#3cf5558bc0f21b4bd116aedcfb90c198b4f2115e"
+source = "git+https://github.com/rust-netlink/wl-nl80211.git#3adb7b96ce97c36cf84a20463d51d41162e41c6c"
 dependencies = [
  "anyhow",
  "bitflags 2.6.0",
