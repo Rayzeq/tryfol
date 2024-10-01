@@ -19,7 +19,7 @@ A custom Wayland bar written in Rust + GTK4.
   - Don't forget to display battery levels somewhere
 - [ ] Full network control (to replace `nm-applet`)
 - [ ] Bluetooth: deterministically sort items
-- [ ] Restructure `tryfol` as a workspace
+- [ ] Restructure `tryfol` as a workspace (use Varlink for IPC ?)
   - `tryfol-...`: crates for modules in `backend/*` that need to be shared between other crates
   - `tryfol-bar`: the bar itself
   - `tryfol-daemon`
