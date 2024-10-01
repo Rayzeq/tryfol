@@ -53,7 +53,7 @@ macro_rules! impl_utils_for_unsigned {
             }
 
             fn first_digit(mut self) -> Self {
-                while self >= 10 {
+                while self > 10 {
                     self /= 10;
                 }
                 self
@@ -139,7 +139,7 @@ impl Japanese for i32 {
 
         let base = self.first_digit();
         let digit_count = self.digit_count();
-        let multiplier = 10i32.pow(digit_count);
+        let multiplier = 10i32.pow(digit_count - 1);
         let remaining = self - base * multiplier;
 
         format!(
