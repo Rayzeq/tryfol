@@ -560,25 +560,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22ec99545bb0ed0ea7bb9b8e1e9122ea386ff8a48c0922e43f36d45ab09e0e80"
 
 [[package]]
-name = "dbusmenu-glib"
-version = "0.1.0"
-dependencies = [
- "dbusmenu-glib-sys",
- "glib 0.20.5",
- "libc",
-]
-
-[[package]]
-name = "dbusmenu-glib-sys"
-version = "0.1.0"
-dependencies = [
- "glib-sys 0.20.5",
- "gobject-sys 0.20.4",
- "libc",
- "system-deps 6.2.2",
-]
-
-[[package]]
 name = "either"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2850,7 +2831,6 @@ dependencies = [
  "async-recursion",
  "async-stream",
  "chrono",
- "dbusmenu-glib",
  "futures",
  "grass",
  "gtk4",
