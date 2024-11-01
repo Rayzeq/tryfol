@@ -3,9 +3,7 @@ pkgs.mkShell {
   nativeBuildInputs = with pkgs.buildPackages; [
     pkg-config
     gtk4
-    (gtk4-layer-shell.overrideAttrs (oldAttrs: {
-      nativeBuildInputs = oldAttrs.nativeBuildInputs ++ [ wayland-protocols ];
-    }))
+    gtk4-layer-shell
     pipewire
     wireplumber
     llvmPackages_17.llvm
