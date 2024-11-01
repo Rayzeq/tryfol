@@ -1,4 +1,4 @@
-use crate::{backend::rfkill, HasTooltip};
+use crate::{backend::rfkill, FormatFixed, HasTooltip};
 use futures::TryStreamExt;
 use gtk::{
     glib::{self, clone},
@@ -206,7 +206,7 @@ async fn update(
             }),
         ) if new_index == old_index && delta.as_secs_f64() > 0. => {
             format!(
-                "  {}/s    {}/s",
+                " {}/s   {}/s",
                 format_bytes((new_rx_bytes - old_rx_bytes) as f64 / delta.as_secs_f64()),
                 format_bytes((new_tx_bytes - old_tx_bytes) as f64 / delta.as_secs_f64())
             )
@@ -215,23 +215,10 @@ async fn update(
     };
 
     icon.set_text(icon_);
-    stats.set_text(&stats_);
+    stats.set_markup(&stats_);
     container.set_better_tooltip(Some(tooltip));
 
     *route = new_route;
-}
-
-fn fixed_width(number: f64, width: usize) -> String {
-    let int_part = number as u64;
-    let int_len = int_part.to_string().len();
-    if int_len >= width {
-        format!("{:.0}", number.round())
-    } else if int_len + 1 == width {
-        // WARNING: this is NOT a space, it's a nobreak space, because a normal space is not large enough
-        format!(" {:.0}", number.round())
-    } else {
-        format!("{number:.0$}", width - (int_len + 1))
-    }
 }
 
 const UNIT_MULTIPLIER: f64 = 1024.;
@@ -245,7 +232,10 @@ fn format_bytes(mut quantity: f64) -> String {
     }
 
     let prefix = UNIT_PREFIXES[i];
-    format!("{}{prefix}B", fixed_width(quantity, 4 - prefix.len()))
+    format!(
+        "<tt>{}{prefix}B</tt>",
+        quantity.format_fixed(4 - prefix.len())
+    )
 }
 
 async fn default_route(
