@@ -16,5 +16,9 @@ pkgs.mkShell {
   shellHook = ''
     export LIBCLANG_PATH="${pkgs.llvmPackages_17.libclang.lib}/lib"
     export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:${pkgs.wireplumber.dev}/lib/pkgconfig"
+    echo "
+      set auto-load safe-path /
+      set debug-file-directory ${pkgs.gtk4.debug}/lib/debug/
+    " > .gdbinit
   '';
 }
