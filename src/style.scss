@@ -34,7 +34,7 @@ $overlays-foreground: #73daca;
 	}
 }
 
-* {
+*:not(check) {
 	all: unset;
 }
 
@@ -69,7 +69,7 @@ popover,
 
 	&.menu {
 		margin-top: 7px;
-		padding: 5px 0px;
+		padding: 7px 0px;
 
 		modelbutton {
 			padding: 1px 7px;
@@ -82,13 +82,13 @@ popover,
 				background-color: #0e4679;
 			}
 
+			check {
+				margin: unset;
+			}
+
 			// nested sub-menus
 			popover.menu {
 				margin-top: 0px;
-				padding-top: 0px;
-				padding-bottom: 0px;
-				border-top-left-radius: 0px;
-				border-bottom-left-radius: 0px;
 			}
 		}
 
@@ -99,6 +99,7 @@ popover,
 
 			&:last-child {
 				padding: unset;
+				margin: unset;
 			}
 		}
 	}

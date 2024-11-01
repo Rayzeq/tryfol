@@ -8,6 +8,7 @@ A custom Wayland bar written in Rust + GTK4.
 
 - Bluetooth
 - Dbusmenu ([Potentially useful resource](https://codeberg.org/janetski/statusnotifier-systray-gtk4/src/branch/main))
+  - Use custom widgets to reduce usage of `Rc<Mutex<...>>`
 - Audio (PipeWire)
 - Network (Netlink)
 - "`things.rs`"
@@ -34,6 +35,5 @@ A custom Wayland bar written in Rust + GTK4.
 
 ## Other known issues
 
-- The bar may sometimes segfault when tray icons update their menus. This issue relates to the `dbusmenu` module and will likely be resolved after refactoring.
 - The Bluetooth module frequently triggers panics, though these are caught by GTK. This should be resolved after the module is refactored.
 - Errors from the mpris module due to players disappearing. Those are not severe in any way, but I might refactor the mpris module to fix them at some point.

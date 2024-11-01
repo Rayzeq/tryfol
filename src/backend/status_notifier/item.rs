@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use super::proxy::{Category, ItemProxy, Orientation, Pixmap, Status};
-use crate::dbusmenu::DBusMenu;
+use crate::backend::dbusmenu::DBusMenu;
 use anyhow::bail;
 use futures::{stream::select_all, Stream, StreamExt};
 use gtk4::{
@@ -112,7 +112,14 @@ impl Item {
     pub async fn menu(&self) -> zbus::Result<Option<DBusMenu>> {
         match self.proxy.menu().await {
             Ok(path) if path.is_empty() => Ok(None),
-            Ok(path) => Ok(Some(DBusMenu::new(self.destination(), &path))),
+            Ok(path) => Ok(Some(
+                DBusMenu::new(
+                    self.proxy.inner().connection(),
+                    self.destination().to_string(),
+                    path.to_string(),
+                )
+                .await?,
+            )),
             // error is likely "No such property “Menu”"
             Err(zbus::Error::FDO(error)) if matches!(*error, fdo::Error::InvalidArgs(_)) => {
                 Ok(None)

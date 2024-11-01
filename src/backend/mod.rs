@@ -1,4 +1,5 @@
 pub mod battery;
+pub mod dbusmenu;
 pub mod hyprland;
 pub mod logind;
 pub mod mpris;

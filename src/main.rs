@@ -12,7 +12,6 @@ use things::StopFuckingWithMyClockLayout;
 mod audio;
 mod backend;
 mod bluetooth;
-mod dbusmenu;
 mod extensions;
 mod modules;
 mod network;

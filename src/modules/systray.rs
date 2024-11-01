@@ -1,10 +1,12 @@
 use crate::{
-    backend::status_notifier::{self, run_host, Category, Event, Orientation, Status},
-    dbusmenu::DBusMenu,
+    backend::{
+        dbusmenu::DBusMenu,
+        status_notifier::{self, run_host, Category, Event, Orientation, Status},
+    },
     Clickable, HasTooltip, Scrollable,
 };
 use anyhow::Context;
-use futures::StreamExt;
+use futures::{lock::Mutex, StreamExt};
 use gtk4::{
     self as gtk,
     gdk::Paintable,
@@ -13,7 +15,7 @@ use gtk4::{
     Image, Overlay, Widget,
 };
 use log::error;
-use std::{cell::RefCell, cmp::Ordering, collections::HashMap, convert::Infallible, rc::Rc};
+use std::{cmp::Ordering, collections::HashMap, convert::Infallible, rc::Rc};
 
 struct Host {
     root: gtk::Box,
@@ -32,7 +34,7 @@ struct Item {
     status: Status,
     icon: Paintable,
     attention_icon: Paintable,
-    menu: Rc<RefCell<Option<DBusMenu>>>,
+    menu: Rc<Mutex<Option<DBusMenu>>>,
 }
 
 struct ItemDisplay {
@@ -359,7 +361,7 @@ impl Item {
         }
     }
 
-    async fn overlay_icon_changed(&mut self) {
+    async fn overlay_icon_changed(&self) {
         let icon = match self
             .item
             .overlay_icon(Self::SIZE, self.overlay.scale_factor())
@@ -378,11 +380,13 @@ impl Item {
     async fn menu_changed(&self) {
         match self.item.menu().await {
             Ok(new_menu) => {
-                if let Some(ref new_menu) = new_menu {
-                    new_menu.set_parent(Some(&self.root));
+                let mut menu = self.menu.lock().await;
+                if let Some(mut old_menu) = menu.take() {
+                    old_menu.set_parent(None::<&Widget>).await;
                 }
-                if let Some(old_menu) = self.menu.replace(new_menu) {
-                    old_menu.set_parent(None::<&Widget>);
+                if let Some(mut new_menu) = new_menu {
+                    new_menu.set_parent(Some(&self.root)).await;
+                    let _ = menu.insert(new_menu);
                 }
             }
             Err(e) => error!("Cannot get item menu: {e}"),
@@ -391,12 +395,12 @@ impl Item {
 
     async fn popup_menu(
         item: status_notifier::Item,
-        menu: Rc<RefCell<Option<DBusMenu>>>,
+        menu: Rc<Mutex<Option<DBusMenu>>>,
         x: i32,
         y: i32,
     ) -> zbus::Result<()> {
-        if let Some(menu) = &*menu.borrow() {
-            menu.popup();
+        if let Some(menu) = &*menu.lock().await {
+            menu.popup().await;
             // early return to avoid the RefCell guard being held across an await point
             return Ok(());
         }
