@@ -15,12 +15,13 @@ A custom Wayland bar written in Rust + GTK4.
 
 ## TODO List (excluding refactors)
 
-- [ ] Full Bluetooth control (to replace `blueman-manager`)
+- Full Bluetooth control (to replace `blueman-manager`)
   - Investigate where connection notifications originate (likely KDE, but may be Blueman or something else)
   - Don't forget to display battery levels somewhere
-- [ ] Full network control (to replace `nm-applet`)
-- [ ] Bluetooth: deterministically sort items
-- [ ] Restructure `tryfol` as a workspace (use Varlink for IPC ?)
+- Full network control (to replace `nm-applet`)
+- Bluetooth: deterministically sort items
+- Workspaces: show icons of contained windows ?
+- Restructure `tryfol` as a workspace (use Varlink for IPC ?)
   - `tryfol-...`: crates for modules in `backend/*` that need to be shared between other crates
   - `tryfol-bar`: the bar itself
   - `tryfol-daemon`
@@ -31,7 +32,8 @@ A custom Wayland bar written in Rust + GTK4.
     - [Battery notifications](https://kota.nz/battery_notifications_with_udev.html)
     - Playerctl replacement (so the "current player" is consistent across keybinds and the bar)
   - `tryfol-idle-inhibitor`: small executable to manually inhibit idling, used to prevent swayidle from triggering after resuming from hibernation (run before sleep and terminate on resume, though it might not solve the issue)
-- [ ] Use a consistent method of displaying errors (either all with `Display` or all with `Debug`)
+- Show USB devices battery if available (logitech mouse)
+- Use a consistent method of displaying errors (either all with `Display` or all with `Debug`)
 
 ## Other known issues
 
