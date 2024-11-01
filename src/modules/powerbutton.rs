@@ -1,7 +1,7 @@
-use gtk::{prelude::*, Button};
+use gtk::{glib, prelude::*, Button};
 use gtk4 as gtk;
 use log::error;
-use std::process::Command;
+use tokio::process::Command;
 
 pub fn new() -> Button {
     let button = Button::builder()
@@ -10,8 +10,12 @@ pub fn new() -> Button {
         .label("")
         .build();
     button.connect_clicked(|_| {
-        if let Err(e) = Command::new("wlogout").arg("-p").arg("layer-shell").spawn() {
-            error!("Failed to start wlogout: {}", e);
+        match Command::new("wlogout").arg("-p").arg("layer-shell").spawn() {
+            Ok(mut child) => {
+                // Prevent zombie process
+                glib::spawn_future_local(async move { child.wait().await });
+            }
+            Err(e) => error!("Failed to start wlogout: {}", e),
         }
     });
 

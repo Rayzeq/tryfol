@@ -11,9 +11,10 @@ use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
     hash::Hash,
-    process::{Command, Stdio},
+    process::Stdio,
     sync::atomic::{AtomicUsize, Ordering},
 };
+use tokio::process::Command;
 use zbus::{
     fdo::{ObjectManagerProxy, PropertiesProxy},
     zvariant::ObjectPath,
@@ -55,11 +56,12 @@ pub fn new() -> gtk::Box {
     container.add_css_class("left");
 
     button.connect_clicked(|_| {
-        Command::new("blueman-manager")
+        let mut child = Command::new("blueman-manager")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
             .unwrap();
+        glib::spawn_future_local(async move { child.wait().await });
     });
 
     let event_controller = EventControllerMotion::new();
