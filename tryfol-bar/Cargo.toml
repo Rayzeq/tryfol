@@ -1,0 +1,53 @@
+[package]
+name = "tryfol-bar"
+version = "0.1.0"
+edition = "2021"
+description = "A custom Wayland bar written in Rust + GTK4"
+license = "MPL-2.0"
+repository = "https://github.com/Rayzeq/tryfol"
+keywords = [ "wayland", "gtk4", "status-bar" ]
+categories = [ "os", "gui" ]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4"
+tokio = { version = "1.40", features = ["full"] }
+zbus = { version = "5.0.1", default-features = false, features = ["tokio"] }
+chrono = { version = "0.4.38", features = ["unstable-locales"] }
+grass = "0.13.2"
+gtk4 = { version = "0.9.1", features = ["v4_14"] }
+gtk4-layer-shell = "0.4.0"
+html-escape = "0.2.13"
+lazy_static = "1.5.0"
+libc = "0.2.153"
+regex = "1.10.4"
+serde = { version = "1.0.201", features = ["derive"] }
+serde_json = "1.0.117"
+udev = "0.9.0"
+futures = "0.3.28"
+rtnetlink = "0.14.1"
+netlink-packet-route = "0.19.0"
+anyhow = "1.0.86"
+async-stream = "0.3.5"
+strum = { version = "0.26.2", features = ["derive"] }
+simple_logger = { version = "5.0.0", default-features = false, features = ["colors", "stderr"] }
+async-recursion = "1.1.1"
+serde_repr = "0.1.19"
+reqwest = "0.12.7"
+
+[dependencies.wl-nl80211]
+git = "https://github.com/rust-netlink/wl-nl80211.git"
+
+[dependencies.wireplumber]
+git = "https://github.com/arcnmx/wireplumber.rs.git"
+branch = "wp-0.5"
+
+features = ["v0_5", "futures", "libspa"]
+
+[dependencies.psutil]
+git = "https://github.com/Rayzeq/rust-psutil.git"
+branch = "cpu-freq"
+
+default-features = false
+features = ["cpu", "memory", "sensors"]

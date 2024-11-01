@@ -86,7 +86,7 @@ fn create_window(app: &Application) {
 
 fn load_css(_: &Application) {
     let css = grass::from_path(
-        "/mnt/Storage/Projects/tryfol/src/style.scss",
+        "/mnt/Storage/Projects/tryfol/tryfol-bar/src/style.scss",
         &grass::Options::default(),
     )
     .expect("invalid css");
