@@ -69,7 +69,7 @@ pub struct Pixmap {
 }
 
 #[proxy(interface = "org.kde.StatusNotifierItem")]
-trait Item {
+pub trait Item {
     /// Asks the status notifier item for activation, this is typically a consequence of user input,
     /// such as mouse left click over the graphical representation of the item.
     /// The application will perform any task is considered appropriate as an activation request.

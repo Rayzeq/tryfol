@@ -3,7 +3,7 @@ pub use super::raw::{LoopStatus, PlaybackStatus, Time};
 use futures::StreamExt;
 use gtk4::glib;
 use log::{error, warn};
-use std::{collections::HashMap, future::Future};
+use std::{borrow::Cow, collections::HashMap, future::Future};
 use zbus::{
     fdo::{DBusProxy, PropertiesChangedArgs, PropertiesProxy},
     names::{InterfaceName, OwnedBusName},
@@ -219,7 +219,7 @@ impl Player {
 
     pub fn connect_on_properties_changed<F, G>(&self, callback: F)
     where
-        F: Fn(InterfaceName, HashMap<&str, Value>, Vec<&str>) -> G + 'static,
+        F: Fn(InterfaceName, HashMap<&str, Value>, Cow<[&str]>) -> G + 'static,
         G: Future,
     {
         let proxy = self.properties.clone();

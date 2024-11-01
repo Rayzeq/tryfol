@@ -13,7 +13,7 @@ categories = [ "os", "gui" ]
 [dependencies]
 log = "0.4"
 tokio = { version = "1.40", features = ["full"] }
-zbus = { version = "4.2.2", default-features = false, features = ["tokio"] }
+zbus = { version = "5.0.1", default-features = false, features = ["tokio"] }
 chrono = { version = "0.4.38", features = ["unstable-locales"] }
 grass = "0.13.2"
 gtk4 = { version = "0.9.1", features = ["v4_14"] }

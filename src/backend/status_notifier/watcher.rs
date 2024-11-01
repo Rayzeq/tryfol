@@ -8,7 +8,7 @@ use zbus::{
     interface,
     message::Header,
     names::{BusName, OwnedBusName},
-    object_server::SignalContext,
+    object_server::SignalEmitter,
     zvariant::OwnedObjectPath,
     Connection,
 };
@@ -103,7 +103,7 @@ impl Watcher {
         service: &str,
         #[zbus(header)] header: Header<'_>,
         #[zbus(connection)] connection: &Connection,
-        #[zbus(signal_context)] signal_context: SignalContext<'_>,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
     ) -> zbus::fdo::Result<()> {
         let (bus_name, path) = Self::get_bus_name(service, &header)?;
         let host_id = bus_name.as_str().to_owned() + path.as_str();
@@ -118,14 +118,14 @@ impl Watcher {
         drop(hosts);
 
         if hosts_count == 1 {
-            self.is_status_notifier_host_registered_changed(&signal_context)
+            self.is_status_notifier_host_registered_changed(&emitter)
                 .await?;
         }
-        Self::status_notifier_host_registered(&signal_context).await?;
+        Self::status_notifier_host_registered(&emitter).await?;
 
         let this = self.clone();
         let connection = connection.to_owned();
-        let signal_context = signal_context.to_owned();
+        let emitter = emitter.to_owned();
         tokio::spawn(async move {
             if let Err(e) = Self::wait_for_service_exit(&connection, bus_name.as_ref()).await {
                 error!("Error while waiting for {bus_name} to disappear: {e}");
@@ -142,13 +142,13 @@ impl Watcher {
 
             if hosts_count == 0 {
                 if let Err(e) = this
-                    .is_status_notifier_host_registered_changed(&signal_context)
+                    .is_status_notifier_host_registered_changed(&emitter)
                     .await
                 {
                     error!("Error while sending is_status_notifier_host_registered signal: {e}");
                 }
             }
-            if let Err(e) = Self::status_notifier_host_unregistered(&signal_context).await {
+            if let Err(e) = Self::status_notifier_host_unregistered(&emitter).await {
                 error!("Error while sending status_notifier_host_unregistered signal: {e}");
             }
         });
@@ -161,7 +161,7 @@ impl Watcher {
         service: &str,
         #[zbus(header)] header: Header<'_>,
         #[zbus(connection)] connection: &Connection,
-        #[zbus(signal_context)] signal_context: SignalContext<'_>,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
     ) -> zbus::fdo::Result<()> {
         let (bus_name, path) = Self::get_bus_name(service, &header)?;
         let item_id = bus_name.as_str().to_owned() + path.as_str();
@@ -173,13 +173,13 @@ impl Watcher {
         // we want to be sure the mutex guard is dropped here and not later
         drop(items);
 
-        self.registered_status_notifier_items_changed(&signal_context)
+        self.registered_status_notifier_items_changed(&emitter)
             .await?;
-        Self::status_notifier_item_registered(&signal_context, &item_id).await?;
+        Self::status_notifier_item_registered(&emitter, &item_id).await?;
 
         let this = self.clone();
         let connection = connection.to_owned();
-        let signal_context = signal_context.to_owned();
+        let emitter = emitter.to_owned();
         tokio::spawn(async move {
             if let Err(e) = Self::wait_for_service_exit(&connection, bus_name.as_ref()).await {
                 error!("Error while waiting for {bus_name} to disappear: {e}");
@@ -190,13 +190,12 @@ impl Watcher {
             }
 
             if let Err(e) = this
-                .registered_status_notifier_items_changed(&signal_context)
+                .registered_status_notifier_items_changed(&emitter)
                 .await
             {
                 error!("Error while sending registered_status_notifier_items signal: {e}");
             }
-            if let Err(e) = Self::status_notifier_item_unregistered(&signal_context, &item_id).await
-            {
+            if let Err(e) = Self::status_notifier_item_unregistered(&emitter, &item_id).await {
                 error!("Error while sending status_notifier_item_unregistered signal: {e}");
             }
         });
@@ -226,21 +225,24 @@ impl Watcher {
     }
 
     #[zbus(signal)]
-    async fn status_notifier_host_registered(signal_ctxt: &SignalContext<'_>) -> zbus::Result<()>;
+    async fn status_notifier_host_registered(
+        signal_emitter: &SignalEmitter<'_>,
+    ) -> zbus::Result<()>;
 
     #[zbus(signal)]
-    async fn status_notifier_host_unregistered(signal_ctxt: &SignalContext<'_>)
-        -> zbus::Result<()>;
+    async fn status_notifier_host_unregistered(
+        signal_emitter: &SignalEmitter<'_>,
+    ) -> zbus::Result<()>;
 
     #[zbus(signal)]
     async fn status_notifier_item_registered(
-        signal_ctxt: &SignalContext<'_>,
+        signal_emitter: &SignalEmitter<'_>,
         service: &str,
     ) -> zbus::Result<()>;
 
     #[zbus(signal)]
     async fn status_notifier_item_unregistered(
-        signal_ctxt: &SignalContext<'_>,
+        signal_emitter: &SignalEmitter<'_>,
         service: &str,
     ) -> zbus::Result<()>;
 }

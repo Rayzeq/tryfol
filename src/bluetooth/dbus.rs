@@ -10,7 +10,7 @@ use zbus::{proxy, zvariant::ObjectPath};
     default_service = "org.bluez",
     default_path = "/org/bluez/hciX/dev_XX_XX_XX_XX_XX_XX"
 )]
-trait Device {
+pub trait Device {
     async fn Pair(&self) -> Result<(), zbus::Error>;
     async fn CancelPairing(&self) -> Result<(), zbus::Error>;
     async fn Connect(&self) -> Result<(), zbus::Error>;
