@@ -1,0 +1,17 @@
+[package]
+name = "ipc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ipc-macros.workspace = true
+# not used directly, but needed by ipc-macros
+anyhow.workspace = true
+log.workspace = true
+
+thiserror = "2"
+tokio = { version = "1", features = ["io-util", "net", "sync", "rt"] }
+futures = "0.3"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros"] }

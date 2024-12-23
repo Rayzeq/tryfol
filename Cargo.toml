@@ -1,3 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["tryfol-bar"]
+members = [ "ipc", "ipc-macros", "tryfol-bar"]
+
+[workspace.dependencies]
+ipc.path = "ipc"
+ipc-macros.path = "ipc-macros"
+
+anyhow = "1"
+log = "0.4"

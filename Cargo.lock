@@ -856,7 +856,7 @@ dependencies = [
  "netlink-packet-generic",
  "netlink-packet-utils",
  "netlink-proto",
- "thiserror",
+ "thiserror 1.0.66",
 ]
 
 [[package]]
@@ -893,7 +893,7 @@ dependencies = [
  "libc",
  "pin-project-lite",
  "smallvec",
- "thiserror",
+ "thiserror 1.0.66",
 ]
 
 [[package]]
@@ -978,7 +978,7 @@ dependencies = [
  "libc",
  "memchr",
  "smallvec",
- "thiserror",
+ "thiserror 1.0.66",
 ]
 
 [[package]]
@@ -1481,6 +1481,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "ipc-macros",
+ "log",
+ "thiserror 2.0.9",
+ "tokio",
+]
+
+[[package]]
+name = "ipc-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1739,7 +1760,7 @@ dependencies = [
  "anyhow",
  "byteorder",
  "paste",
- "thiserror",
+ "thiserror 1.0.66",
 ]
 
 [[package]]
@@ -1753,7 +1774,7 @@ dependencies = [
  "log",
  "netlink-packet-core",
  "netlink-sys",
- "thiserror",
+ "thiserror 1.0.66",
  "tokio",
 ]
 
@@ -2085,9 +2106,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.89"
+version = "1.0.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f139b0662de085916d1fb67d2b4169d1addddda1919e696f3252b740b629986e"
+checksum = "37d3544b3f2748c54e147655edb5025752e2303145b5aefb3c3ea2c78b973bb0"
 dependencies = [
  "unicode-ident",
 ]
@@ -2103,7 +2124,7 @@ dependencies = [
  "nix 0.24.3",
  "num_cpus",
  "once_cell",
- "thiserror",
+ "thiserror 1.0.66",
 ]
 
 [[package]]
@@ -2261,7 +2282,7 @@ dependencies = [
  "netlink-proto",
  "netlink-sys",
  "nix 0.27.1",
- "thiserror",
+ "thiserror 1.0.66",
  "tokio",
 ]
 
@@ -2563,9 +2584,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "syn"
-version = "2.0.86"
+version = "2.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e89275301d38033efb81a6e60e3497e734dfcc62571f2854bf4b16690398824c"
+checksum = "d53cbcb5a243bd33b7858b1d7f4aca2153490815872d86d955d6ea29f743c035"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2653,7 +2674,16 @@ version = "1.0.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d171f59dbaa811dbbb1aee1e73db92ec2b122911a48e1390dfe327a821ddede"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 1.0.66",
+]
+
+[[package]]
+name = "thiserror"
+version = "2.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f072643fd0190df67a8bab670c20ef5d8737177d6ac6b2e9a236cb096206b2cc"
+dependencies = [
+ "thiserror-impl 2.0.9",
 ]
 
 [[package]]
@@ -2661,6 +2691,17 @@ name = "thiserror-impl"
 version = "1.0.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b08be0f17bd307950653ce45db00cd31200d82b624b36e181337d9c7d92765b5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b50fa271071aae2e6ee85f842e2e28ba8cd2c5fb67f11fcb1fd70b276f9e7d4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3318,7 +3359,7 @@ dependencies = [
  "netlink-packet-utils",
  "netlink-proto",
  "netlink-sys",
- "thiserror",
+ "thiserror 1.0.66",
  "tokio",
 ]
 
