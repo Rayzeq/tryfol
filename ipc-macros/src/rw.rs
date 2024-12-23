@@ -163,6 +163,11 @@ fn write_code(data: &Data) -> TokenStream {
             }
         }
         Data::Enum(ref data) => {
+            if data.variants.is_empty() {
+                return quote! {
+                    ::std::unreachable!("Cannot write empty enum because there is no valid discriminant");
+                };
+            }
             let recurse = data.variants.iter().enumerate().map(|(i, v)| {
                 let name = &v.ident;
                 let fields = fields_to_pattern(&v.fields);
