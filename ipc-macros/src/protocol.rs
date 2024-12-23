@@ -264,7 +264,7 @@ mod server_trait {
         utils::{FunctionEditor, ParseType, TraitEditor},
     };
     use quote::quote;
-    use syn::{parse_quote, Ident, ItemTrait, TraitItem};
+    use syn::{parse_quote, FnArg, Ident, ItemTrait, TraitItem};
 
     pub fn make(mut input: ItemTrait, module_name: &Ident) -> ItemTrait {
         input.set_name(Ident::new(
@@ -308,10 +308,19 @@ mod server_trait {
             let is_stream = is_stream(&method.sig.output);
             let variant_name = &method.sig.ident;
 
+            let call_name = Ident::new(&(method.sig.ident.to_string() + "Call"), method.sig.ident.span());
+            let args_name: Vec<_> = method.sig.inputs.iter().filter_map(|arg| {
+                if let FnArg::Typed(arg) = arg {
+                    Some(&arg.pat)
+                } else {
+                    None
+                }
+            }).collect();
+
             if is_stream {
                 quote! {
-                    #module_name::MethodCall::#variant_name(call) => {
-                        let stream = match Self::#variant_name(&this, call.call).await {
+                    #module_name::MethodCall::#variant_name(#module_name::#call_name { #(#args_name,)* }) => {
+                        let stream = match Self::#variant_name(&this, #(#args_name,)*).await {
                             ::core::result::Result::Ok(x) => x,
                             ::core::result::Result::Err(e) => {
                                 send_packet!(#module_name::Response::Error(::std::format!("{e}")));
@@ -331,8 +340,8 @@ mod server_trait {
                 }
             } else {
                 quote! {
-                    #module_name::MethodCall::#variant_name(call) => {
-                        send_packet!(match Self::#variant_name(&this, call.call).await {
+                    #module_name::MethodCall::#variant_name(#module_name::#call_name { #(#args_name,)* }) => {
+                        send_packet!(match Self::#variant_name(&this, #(#args_name,)*).await {
                             ::core::result::Result::Ok(x) => #module_name::Response::#variant_name(x),
                             ::core::result::Result::Err(e) => #module_name::Response::Error(::std::format!("{e}")),
                         });
