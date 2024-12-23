@@ -379,7 +379,7 @@ mod server_trait {
                                 });
                             }
                             ::core::result::Result::Err(e) => {
-                                if let ::core::option::Option::Some(e) = ::ipc::anyhow::Error::downcast_ref::<io::Error>(&e) {
+                                if let ::core::option::Option::Some(e) = ::ipc::anyhow::Error::downcast_ref::<::std::io::Error>(&e) {
                                     if ::std::io::Error::kind(&e) == ::std::io::ErrorKind::UnexpectedEof {
                                         // client quitted normally
                                         break;
