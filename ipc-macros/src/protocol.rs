@@ -331,7 +331,7 @@ mod server_trait {
                         let mut stream = ::std::pin::pin!(stream);
                         while let ::core::option::Option::Some(response) = ::ipc::futures::StreamExt::next(&mut stream).await {
                             send_packet!(match response {
-                                ::core::result::Result::Ok(x) => #module_name::Response::long_mpris(x),
+                                ::core::result::Result::Ok(x) => #module_name::Response::#variant_name(x),
                                 ::core::result::Result::Err(e) => #module_name::Response::Error(::std::format!("{e}")),
                             });
                         }
