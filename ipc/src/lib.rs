@@ -13,7 +13,7 @@ mod errors;
 pub mod packet;
 pub mod rw;
 
-pub use client::{Connection, ResponseStream};
+pub use client::Connection;
 pub use errors::ClientError;
 use rw::{Read, Write};
 

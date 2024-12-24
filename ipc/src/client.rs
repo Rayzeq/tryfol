@@ -4,21 +4,17 @@ use crate::{
     rw::{Read, Write},
     AnyCall, LongMethod, Method,
 };
-use futures::Stream;
+use futures::{stream, Stream};
 use log::{error, warn};
 use std::{
     collections::HashMap,
     fmt::Debug,
-    future::Future,
     io,
-    marker::PhantomData,
     os::unix::net::{SocketAddr, UnixStream as StdUnixStream},
-    pin::{pin, Pin},
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
     },
-    task::{Context, Poll},
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -34,18 +30,17 @@ pub struct Connection<T: AnyCall, TX: AsyncWriteExt + Unpin + Send> {
     channels: Arc<Mutex<HashMap<u64, mpsc::UnboundedSender<T::Response>>>>,
 }
 
-#[derive(Debug)]
-pub struct ResponseStream<T: AnyCall, M: LongMethod> {
-    call_id: u64,
-    channels: Arc<Mutex<HashMap<u64, mpsc::UnboundedSender<T::Response>>>>,
-    receiver: mpsc::UnboundedReceiver<T::Response>,
-    phantom: PhantomData<M>,
-}
-
 impl<T: AnyCall> Connection<T, OwnedWriteHalf>
 where
     anyhow::Error: From<<T as Write>::Error> + From<<T::Response as Read>::Error>,
 {
+    /// Create a connection from a unix socket address
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the socket can't be created,
+    /// connected to the address, set in non-blocking mode or converted to
+    /// a tokio socket.
     pub fn from_unix_address(address: &SocketAddr) -> io::Result<Self> {
         let stream = StdUnixStream::connect_addr(address)?;
         stream.set_nonblocking(true)?;
@@ -114,18 +109,34 @@ where
     pub async fn long_call<M>(
         &self,
         method: M,
-    ) -> Result<ResponseStream<T, M>, ClientError<T::Response>>
+    ) -> Result<
+        impl Stream<Item = Result<M::Response, ClientError<T::Response>>>,
+        ClientError<T::Response>,
+    >
     where
         M: LongMethod + Into<T>,
+        T::Response: TryInto<Option<M::Response>, Error = ClientError<T::Response>>,
     {
         let (call_id, rx) = self.call_base(method).await?;
+        let channels = Arc::clone(&self.channels);
 
-        Ok(ResponseStream {
-            call_id,
-            channels: Arc::clone(&self.channels),
-            receiver: rx,
-            phantom: PhantomData,
-        })
+        Ok(stream::unfold(
+            (rx, channels),
+            move |(mut receiver, channels)| async move {
+                // unwrap: the sender is dropped after the end of the stream
+                let response = receiver.recv().await.unwrap();
+                let response: Option<M::Response> = match response.try_into() {
+                    Ok(x) => x,
+                    Err(e) => return Some((Err(e), (receiver, channels))),
+                };
+
+                if response.is_none() {
+                    channels.lock().await.remove(&call_id);
+                }
+
+                response.map(|x| (Ok(x), (receiver, channels)))
+            },
+        ))
     }
 
     async fn call_base<M>(
@@ -151,30 +162,5 @@ where
         }
 
         Ok((call_id, rx))
-    }
-}
-
-impl<T: AnyCall, M: LongMethod + Unpin> Stream for ResponseStream<T, M>
-where
-    T::Response: TryInto<Option<M::Response>, Error = ClientError<T::Response>>,
-{
-    type Item = Result<M::Response, ClientError<T::Response>>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let future = pin!(async move {
-            // unwrap: the sender is dropped after the end of the stream
-            let response = self.receiver.recv().await.unwrap();
-            let response: Option<M::Response> = match response.try_into() {
-                Ok(x) => x,
-                Err(e) => return Some(Err(e)),
-            };
-
-            if response.is_none() {
-                self.channels.lock().await.remove(&self.call_id);
-            }
-
-            response.map(Ok)
-        });
-        future.poll(cx)
     }
 }
