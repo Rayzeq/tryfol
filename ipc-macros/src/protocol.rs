@@ -263,6 +263,7 @@ mod server_trait {
         protocol::is_stream,
         utils::{FunctionEditor, ParseType, TraitEditor},
     };
+    use proc_macro2::TokenStream;
     use quote::quote;
     use syn::{parse_quote, FnArg, Ident, ItemTrait, TraitItem};
 
@@ -302,7 +303,83 @@ mod server_trait {
     }
 
     fn make_handle_client_method(input: &ItemTrait, module_name: &Ident) -> TraitItem {
-        let branches: Vec<_> = input
+        let branches = make_packet_branches(input, module_name);
+
+        parse_quote! {
+            fn handle_client(
+                self,
+                mut rx: impl ::ipc::tokio::io::AsyncReadExt + ::core::marker::Unpin + ::core::marker::Send,
+                tx: impl ::ipc::tokio::io::AsyncWriteExt + ::core::marker::Unpin + ::core::marker::Send + 'static,
+            ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send
+            where
+                Self: ::core::clone::Clone + ::core::marker::Send + ::core::marker::Sync + 'static,
+            {
+                async move {
+                    struct CancelGuard {
+                        tasks: ::std::vec::Vec<::ipc::tokio::task::JoinHandle<()>>,
+                    }
+
+                    impl ::core::ops::Drop for CancelGuard {
+                        fn drop(&mut self) {
+                            for task in &self.tasks {
+                                ::ipc::tokio::task::JoinHandle::abort(&task);
+                            }
+                        }
+                    }
+
+                    let tx = ::std::sync::Arc::new(::ipc::tokio::sync::Mutex::new(tx));
+                    let mut cancel_guard = CancelGuard {
+                        tasks: ::std::vec::Vec::new(),
+                    };
+                    loop {
+                        match <::ipc::packet::Clientbound::<#module_name::MethodCall> as ::ipc::rw::Read>::read(&mut rx).await {
+                            ::core::result::Result::Ok(packet) => {
+                                let tx = <::std::sync::Arc<_> as ::core::clone::Clone>::clone(&tx);
+                                let this = <Self as ::core::clone::Clone>::clone(&self);
+                                ::std::vec::Vec::push(&mut cancel_guard.tasks, ::ipc::tokio::spawn(async move {
+                                    macro_rules! send_packet {
+                                        ($payload:expr) => {
+                                            let packet = ::ipc::packet::Serverbound {
+                                                call_id: packet.call_id,
+                                                payload: $payload,
+                                            };
+                                            let result = <::ipc::packet::Serverbound<_> as ::ipc::rw::Write>::write(&packet, &mut *::tokio::sync::Mutex::lock(&tx).await).await;
+                                            if let ::core::result::Result::Err(e) = result {
+                                                if let ::core::option::Option::Some(e) = ::ipc::anyhow::Error::downcast_ref::<::std::io::Error>(&e) {
+                                                    if ::std::io::Error::kind(&e) == ::std::io::ErrorKind::BrokenPipe {
+                                                        // client quitted normally
+                                                        return;
+                                                    }
+                                                }
+                                                ::ipc::log::error!("Error while sending packet to client: {e:?}");
+                                            }
+                                        };
+                                    }
+
+                                    match packet.payload {
+                                        #(#branches)*
+                                    }
+                                }));
+                            }
+                            ::core::result::Result::Err(e) => {
+                                if let ::core::option::Option::Some(e) = ::ipc::anyhow::Error::downcast_ref::<::std::io::Error>(&e) {
+                                    if ::std::io::Error::kind(&e) == ::std::io::ErrorKind::UnexpectedEof {
+                                        // client quitted normally
+                                        break;
+                                    }
+                                }
+                                ::ipc::log::error!("Error receiving message from client: {e:?}");
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn make_packet_branches(input: &ItemTrait, module_name: &Ident) -> Vec<TokenStream> {
+        input
         .methods()
         .map(|method| {
             let is_stream = is_stream(&method.sig.output);
@@ -349,64 +426,6 @@ mod server_trait {
                 }
             }
         })
-        .collect();
-
-        parse_quote! {
-            fn handle_client(
-                self,
-                mut rx: impl ::ipc::tokio::io::AsyncReadExt + ::core::marker::Unpin + ::core::marker::Send,
-                tx: impl ::ipc::tokio::io::AsyncWriteExt + ::core::marker::Unpin + ::core::marker::Send + 'static,
-            ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send
-            where
-                Self: ::core::clone::Clone + ::core::marker::Send + ::core::marker::Sync + 'static,
-            {
-                async move {
-                    let tx = ::std::sync::Arc::new(::ipc::tokio::sync::Mutex::new(tx));
-
-                    loop {
-                        match <::ipc::packet::Clientbound::<#module_name::MethodCall> as ::ipc::rw::Read>::read(&mut rx).await {
-                            ::core::result::Result::Ok(packet) => {
-                                let tx = <::std::sync::Arc<_> as ::core::clone::Clone>::clone(&tx);
-                                let this = <Self as ::core::clone::Clone>::clone(&self);
-                                ::ipc::tokio::spawn(async move {
-                                    macro_rules! send_packet {
-                                        ($payload:expr) => {
-                                            let packet = ::ipc::packet::Serverbound {
-                                                call_id: packet.call_id,
-                                                payload: $payload,
-                                            };
-                                            let result = <::ipc::packet::Serverbound<_> as ::ipc::rw::Write>::write(&packet, &mut *::tokio::sync::Mutex::lock(&tx).await).await;
-                                            if let ::core::result::Result::Err(e) = result {
-                                                if let ::core::option::Option::Some(e) = ::ipc::anyhow::Error::downcast_ref::<::std::io::Error>(&e) {
-                                                    if ::std::io::Error::kind(&e) == ::std::io::ErrorKind::BrokenPipe {
-                                                        // client quitted normally
-                                                        return;
-                                                    }
-                                                }
-                                                ::ipc::log::error!("Error while sending packet to client: {e:?}");
-                                            }
-                                        };
-                                    }
-
-                                    match packet.payload {
-                                        #(#branches)*
-                                    }
-                                });
-                            }
-                            ::core::result::Result::Err(e) => {
-                                if let ::core::option::Option::Some(e) = ::ipc::anyhow::Error::downcast_ref::<::std::io::Error>(&e) {
-                                    if ::std::io::Error::kind(&e) == ::std::io::ErrorKind::UnexpectedEof {
-                                        // client quitted normally
-                                        break;
-                                    }
-                                }
-                                ::ipc::log::error!("Error receiving message from client: {e:?}");
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        .collect()
     }
 }
