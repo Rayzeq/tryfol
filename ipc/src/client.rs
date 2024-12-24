@@ -9,7 +9,7 @@ use log::{error, warn};
 use std::{
     collections::HashMap,
     fmt::Debug,
-    io,
+    io::{self, ErrorKind},
     os::unix::net::{SocketAddr, UnixStream as StdUnixStream},
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -75,7 +75,13 @@ where
                         }
                     }
                     Err(e) => {
-                        error!("Error while receiving response: {e}");
+                        if !e
+                            .downcast_ref::<io::Error>()
+                            .is_some_and(|e| e.kind() == ErrorKind::UnexpectedEof)
+                        {
+                            error!("Error while receiving response: {e}");
+                        }
+                        channels2.lock().await.clear();
                         break;
                     }
                 };
@@ -96,8 +102,10 @@ where
     {
         let (call_id, mut rx) = self.call_base(method).await?;
 
-        // unwrap: the sender is dropped on the next line, after this call
-        let response = rx.recv().await.unwrap();
+        let Some(response) = rx.recv().await else {
+            // the sender has been dropped because the server closed
+            return Err(ClientError::Connection);
+        };
 
         self.channels.lock().await.remove(&call_id);
         // ensure the receiver is dropped after the channel has been removed from the list
@@ -121,20 +129,26 @@ where
         let channels = Arc::clone(&self.channels);
 
         Ok(stream::unfold(
-            (rx, channels),
-            move |(mut receiver, channels)| async move {
-                // unwrap: the sender is dropped after the end of the stream
-                let response = receiver.recv().await.unwrap();
+            (rx, channels, false),
+            move |(mut receiver, channels, error_sent)| async move {
+                let Some(response) = receiver.recv().await else {
+                    // the sender has been dropped because the server closed
+                    if error_sent {
+                        return None;
+                    } else {
+                        return Some((Err(ClientError::Connection), (receiver, channels, true)));
+                    }
+                };
                 let response: Option<M::Response> = match response.try_into() {
                     Ok(x) => x,
-                    Err(e) => return Some((Err(e), (receiver, channels))),
+                    Err(e) => return Some((Err(e), (receiver, channels, error_sent))),
                 };
 
                 if response.is_none() {
                     channels.lock().await.remove(&call_id);
                 }
 
-                response.map(|x| (Ok(x), (receiver, channels)))
+                response.map(|x| (Ok(x), (receiver, channels, error_sent)))
             },
         ))
     }
