@@ -377,6 +377,12 @@ mod server_trait {
                                             };
                                             let result = <::ipc::packet::Serverbound<_> as ::ipc::rw::Write>::write(&packet, &mut *::tokio::sync::Mutex::lock(&tx).await).await;
                                             if let ::core::result::Result::Err(e) = result {
+                                                if let ::core::option::Option::Some(e) = ::ipc::anyhow::Error::downcast_ref::<::std::io::Error>(&e) {
+                                                    if ::std::io::Error::kind(&e) == ::std::io::ErrorKind::BrokenPipe {
+                                                        // client quitted normally
+                                                        return;
+                                                    }
+                                                }
                                                 ::ipc::log::error!("Error while sending packet to client: {e:?}");
                                             }
                                         };
