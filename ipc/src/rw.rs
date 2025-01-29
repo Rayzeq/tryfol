@@ -287,7 +287,14 @@ ipc_macros::__impl_rw_for_option!();
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ipc_macros::{Read, Write};
     use tokio::io::{BufReader, BufWriter};
+
+    #[derive(Read, Write)]
+    pub struct EmptyStruct {}
+
+    #[derive(Read, Write)]
+    pub enum EmptyEnum {}
 
     #[tokio::test]
     async fn test_read_unit() {
