@@ -281,6 +281,9 @@ where
     }
 }
 
+ipc_macros::__impl_rw_for_result!();
+ipc_macros::__impl_rw_for_option!();
+
 #[cfg(test)]
 mod tests {
     use super::*;
