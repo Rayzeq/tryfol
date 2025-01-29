@@ -36,3 +36,14 @@ pub trait AnyCall: Send + Sync + Write<Error: Send + Sync + 'static> {
 
 /// Trait implemented by the enum containing all possible reponses
 pub trait AnyResponse: Debug + Send + Sync + Read<Error: Send + Sync> + 'static {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[protocol]
+    pub trait ProtocolWithTwoIdenticalReturnType {
+        async fn func1(&self) -> ipc::Result<u32>;
+        async fn func2(&self) -> ipc::Result<u32>;
+    }
+}
