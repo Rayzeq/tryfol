@@ -11,6 +11,7 @@ pub fn derive_read(input: DeriveInput) -> TokenStream {
         input.generics,
         &quote!(::ipc::rw::Read<Error: ::core::marker::Send + ::core::marker::Sync + 'static>),
         &parse_quote!(::ipc::rw::Read),
+        matches!(input.data, Data::Enum(_)),
     );
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     let mut where_clause = where_clause.cloned().unwrap_or_else(|| parse_quote!(where));
@@ -40,6 +41,7 @@ pub fn derive_write(input: DeriveInput) -> TokenStream {
         input.generics,
         &quote!(::ipc::rw::Write<Error: ::core::marker::Send + ::core::marker::Sync + 'static>),
         &parse_quote!(::ipc::rw::Write),
+        false,
     );
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     let mut where_clause = where_clause.cloned().unwrap_or_else(|| parse_quote!(where));
@@ -70,6 +72,7 @@ fn add_trait_bounds(
     mut generics: Generics,
     r#trait: &TokenStream,
     generic_trait: &TypeParamBound,
+    is_enum_and_read: bool,
 ) -> (Generics, Vec<WherePredicate>) {
     let mut where_predicates = Vec::with_capacity(generics.params.len());
     for param in &mut generics.params {
@@ -83,6 +86,12 @@ fn add_trait_bounds(
                 parse_quote!(::anyhow::Error: ::core::convert::From<<#name as #generic_trait>::Error>),
             );
         }
+    }
+
+    if is_enum_and_read {
+        where_predicates.push(
+            parse_quote!(::anyhow::Error: ::core::convert::From<::ipc::rw::InvalidDiscriminantError>),
+        );
     }
 
     (generics, where_predicates)
