@@ -37,7 +37,7 @@ serde_repr = "0.1.19"
 reqwest = "0.12.7"
 
 [dependencies.wl-nl80211]
-git = "https://github.com/rust-netlink/wl-nl80211.git"
+git = "https://github.com/ThisSeanZhang/wl-nl80211.git"
 
 [dependencies.wireplumber]
 git = "https://github.com/arcnmx/wireplumber.rs.git"

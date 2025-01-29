@@ -3357,7 +3357,7 @@ dependencies = [
 [[package]]
 name = "wl-nl80211"
 version = "0.2.0"
-source = "git+https://github.com/rust-netlink/wl-nl80211.git#1ff5dac43e4efc8c1d23aca1c5c26d8f9eb19b5c"
+source = "git+https://github.com/ThisSeanZhang/wl-nl80211.git#e8485322a08b8aa69fbbc2a9d73f72b663ab69e7"
 dependencies = [
  "anyhow",
  "bitflags 2.6.0",
