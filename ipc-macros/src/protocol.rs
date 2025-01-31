@@ -48,6 +48,7 @@ mod inner_module {
 
     pub fn make(input: &ItemTrait, module_name: &Ident) -> ItemMod {
         let response = make_response(input);
+        let response_structs = make_response_structs(input);
         let method_call = make_method_call(input);
         let call_structs = make_call_structs(input);
 
@@ -57,6 +58,7 @@ mod inner_module {
                 use super::*;
 
                 #response
+                #(#response_structs)*
                 #method_call
                 #(#call_structs)*
             }
@@ -68,9 +70,9 @@ mod inner_module {
             .methods()
             .map(|method| {
                 let name = &method.sig.ident;
-                let field_type = get_response_type(method);
+                let struct_name = Ident::new(&(name.to_string() + "Response"), name.span());
                 quote! {
-                    #name(#field_type)
+                    #name(#struct_name)
                 }
             })
             .collect();
@@ -85,6 +87,64 @@ mod inner_module {
 
             impl ::ipc::AnyResponse for Response {}
         }
+    }
+
+    fn make_response_structs(input: &ItemTrait) -> Vec<TokenStream> {
+        input
+            .methods()
+            .map(|method| {
+                let name = &method.sig.ident;
+                let field_type = get_response_type(method);
+                let struct_name = Ident::new(&(name.to_string() + "Response"), name.span());
+
+                let conditional = if is_stream(&method.sig.output) {
+                    quote! {
+                        impl ::core::convert::TryFrom<Response> for ::core::option::Option<#struct_name> {
+                            type Error = ::ipc::ClientError<Response>;
+
+                            fn try_from(value: Response) -> ::core::result::Result<Self, Self::Error> {
+                                match value {
+                                    Response::#name(response) => ::core::result::Result::Ok(::core::option::Option::Some(response)),
+                                    Response::EndOfStream => ::core::result::Result::Ok(::core::option::Option::None),
+                                    Response::Error(error) => ::core::result::Result::Err(::ipc::ClientError::Server(error)),
+                                    value => ::core::result::Result::Err(::ipc::ClientError::Type(value)),
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    quote! {
+                        impl ::core::convert::TryFrom<Response> for #struct_name {
+                            type Error = ::ipc::ClientError<Response>;
+
+                            fn try_from(value: Response) -> ::core::result::Result<Self, Self::Error> {
+                                match value {
+                                    Response::#name(response) => ::core::result::Result::Ok(response),
+                                    Response::Error(error) => ::core::result::Result::Err(::ipc::ClientError::Server(error)),
+                                    value => ::core::result::Result::Err(::ipc::ClientError::Type(value)),
+                                }
+                            }
+                        }
+                    }
+                };
+
+
+                quote! {
+                    #[derive(::core::fmt::Debug, ::core::clone::Clone, ::ipc::Read, ::ipc::Write)]
+                    pub struct #struct_name(pub #field_type);
+
+                    impl ::ipc::Response for #struct_name {
+                        type Inner = #field_type;
+
+                        fn into_inner(self) -> Self::Inner {
+                            self.0
+                        }
+                    }
+
+                    #conditional
+                }
+            })
+            .collect()
     }
 
     fn make_method_call(input: &ItemTrait) -> TokenStream {
@@ -118,6 +178,10 @@ mod inner_module {
             .map(|method| {
                 let variant_name = &method.sig.ident;
                 let name = Ident::new(&(variant_name.to_string() + "Call"), variant_name.span());
+                let response_name = Ident::new(
+                    &(variant_name.to_string() + "Response"),
+                    variant_name.span(),
+                );
 
                 let fields = method.sig.inputs.iter().filter_map(|arg| {
                     if let FnArg::Typed(arg) = arg {
@@ -129,42 +193,16 @@ mod inner_module {
                     }
                 });
 
-                let response_type = get_response_type(method);
                 let conditional = if is_stream(&method.sig.output) {
                     quote! {
                         impl ::ipc::LongMethod for #name {
-                            type Response = #response_type;
-                        }
-
-                        impl ::core::convert::TryFrom<Response> for ::core::option::Option<#response_type> {
-                            type Error = ::ipc::ClientError<Response>;
-
-                            fn try_from(value: Response) -> ::core::result::Result<Self, Self::Error> {
-                                match value {
-                                    Response::#variant_name(response) => ::core::result::Result::Ok(::core::option::Option::Some(response)),
-                                    Response::EndOfStream => ::core::result::Result::Ok(::core::option::Option::None),
-                                    Response::Error(error) => ::core::result::Result::Err(::ipc::ClientError::Server(error)),
-                                    value => ::core::result::Result::Err(::ipc::ClientError::Type(value)),
-                                }
-                            }
+                            type Response = #response_name;
                         }
                     }
                 } else {
                     quote! {
                         impl ::ipc::Method for #name {
-                            type Response = #response_type;
-                        }
-
-                        impl ::core::convert::TryFrom<Response> for #response_type {
-                            type Error = ::ipc::ClientError<Response>;
-
-                            fn try_from(value: Response) -> ::core::result::Result<Self, Self::Error> {
-                                match value {
-                                    Response::#variant_name(response) => ::core::result::Result::Ok(response),
-                                    Response::Error(error) => ::core::result::Result::Err(::ipc::ClientError::Server(error)),
-                                    value => ::core::result::Result::Err(::ipc::ClientError::Type(value)),
-                                }
-                            }
+                            type Response = #response_name;
                         }
                     }
                 };
@@ -386,6 +424,7 @@ mod server_trait {
             let variant_name = &method.sig.ident;
 
             let call_name = Ident::new(&(method.sig.ident.to_string() + "Call"), method.sig.ident.span());
+            let reponse_name = Ident::new(&(method.sig.ident.to_string() + "Response"), method.sig.ident.span());
             let args_name: Vec<_> = method.sig.inputs.iter().filter_map(|arg| {
                 if let FnArg::Typed(arg) = arg {
                     Some(&arg.pat)
@@ -408,7 +447,7 @@ mod server_trait {
                         let mut stream = ::std::pin::pin!(stream);
                         while let ::core::option::Option::Some(response) = ::ipc::futures::StreamExt::next(&mut stream).await {
                             send_packet!(match response {
-                                ::core::result::Result::Ok(x) => #module_name::Response::#variant_name(x),
+                                ::core::result::Result::Ok(x) => #module_name::Response::#variant_name(#module_name::#reponse_name(x)),
                                 ::core::result::Result::Err(e) => #module_name::Response::Error(::std::format!("{e}")),
                             });
                         }
@@ -419,7 +458,7 @@ mod server_trait {
                 quote! {
                     #module_name::MethodCall::#variant_name(#module_name::#call_name { #(#args_name,)* }) => {
                         send_packet!(match Self::#variant_name(&this, #(#args_name,)*).await {
-                            ::core::result::Result::Ok(x) => #module_name::Response::#variant_name(x),
+                            ::core::result::Result::Ok(x) => #module_name::Response::#variant_name(#module_name::#reponse_name(x)),
                             ::core::result::Result::Err(e) => #module_name::Response::Error(::std::format!("{e}")),
                         });
                     }

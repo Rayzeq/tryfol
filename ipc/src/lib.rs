@@ -21,17 +21,23 @@ pub type Result<T, E> = core::result::Result<T, ClientError<E>>;
 
 /// Type of a method call, it contains the arguments of the method
 pub trait Method: Send + Sync {
-    type Response;
+    type Response: Response;
 }
 
 /// Type of a method call that returns a stream, it contains the arguments of the method
 pub trait LongMethod: Send + Sync {
-    type Response;
+    type Response: Response;
 }
 
 /// Trait implemented by the enum containing all possible calls
 pub trait AnyCall: Send + Sync + Write<Error: Send + Sync + 'static> {
     type Response: AnyResponse;
+}
+
+/// Type of the response of one precise method call
+pub trait Response {
+    type Inner;
+    fn into_inner(self) -> Self::Inner;
 }
 
 /// Trait implemented by the enum containing all possible reponses

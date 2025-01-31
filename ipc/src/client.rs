@@ -2,7 +2,7 @@ use crate::{
     errors::ClientError,
     packet::{self, Clientbound},
     rw::{Read, Write},
-    AnyCall, LongMethod, Method,
+    AnyCall, LongMethod, Method, Response,
 };
 use futures::{stream, Stream};
 use log::{error, warn};
@@ -95,7 +95,10 @@ where
         }
     }
 
-    pub async fn call<M>(&self, method: M) -> Result<M::Response, ClientError<T::Response>>
+    pub async fn call<M>(
+        &self,
+        method: M,
+    ) -> Result<<M::Response as Response>::Inner, ClientError<T::Response>>
     where
         M: Method + Into<T>,
         T::Response: TryInto<M::Response, Error = ClientError<T::Response>>,
@@ -111,14 +114,14 @@ where
         // ensure the receiver is dropped after the channel has been removed from the list
         drop(rx);
 
-        response.try_into()
+        response.try_into().map(Response::into_inner)
     }
 
     pub async fn long_call<M>(
         &self,
         method: M,
     ) -> Result<
-        impl Stream<Item = Result<M::Response, ClientError<T::Response>>>,
+        impl Stream<Item = Result<<M::Response as Response>::Inner, ClientError<T::Response>>>,
         ClientError<T::Response>,
     >
     where
@@ -148,7 +151,7 @@ where
                     channels.lock().await.remove(&call_id);
                 }
 
-                response.map(|x| (Ok(x), (receiver, channels, error_sent)))
+                response.map(|x| (Ok(x.into_inner()), (receiver, channels, error_sent)))
             },
         ))
     }
