@@ -287,6 +287,7 @@ fn make_client(input: &ItemTrait, module_name: &Ident) -> TokenStream {
 
     quote! {
         #[derive(::core::fmt::Debug)]
+        #[allow(clippy::module_name_repetitions)]
         #vis struct #client_name<T: ::ipc::tokio::io::AsyncWriteExt + ::core::marker::Unpin + ::core::marker::Send> {
             inner: ::ipc::Connection<#module_name::MethodCall, T>,
         }
@@ -311,6 +312,9 @@ mod server_trait {
             &(input.ident.to_string() + "Server"),
             input.ident.span(),
         ));
+        input
+            .attrs
+            .push(parse_quote!(#[allow(clippy::module_name_repetitions)]));
 
         let handle_client_method = make_handle_client_method(&input, module_name);
         input.items.push(handle_client_method);

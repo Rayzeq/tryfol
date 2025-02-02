@@ -47,6 +47,7 @@ pub trait AnyResponse: Debug + Send + Sync + Read<Error: Send + Sync> + 'static 
 mod tests {
     use super::*;
 
+    #[allow(unused)]
     #[protocol]
     pub trait ProtocolWithTwoIdenticalReturnType {
         async fn func1(&self) -> ipc::Result<u32>;
