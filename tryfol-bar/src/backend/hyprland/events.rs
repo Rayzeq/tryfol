@@ -167,10 +167,7 @@ pub async fn events() -> anyhow::Result<impl Stream<Item = anyhow::Result<Event>
 
                     if !messages.is_empty() {
                         for message in messages.split(|x| *x == b'\n') {
-                            yield Event::from(
-                                std::str::from_utf8(message)
-                                    .context("Invalid utf8 received from Hyprland event socket")?,
-                            );
+                            yield Event::from(String::from_utf8_lossy(message).as_ref());
                         }
                     }
 
