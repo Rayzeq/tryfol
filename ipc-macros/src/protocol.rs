@@ -250,6 +250,7 @@ fn make_client_trait(mut input: ItemTrait, module_name: &Ident) -> ItemTrait {
 fn make_client(input: &ItemTrait, module_name: &Ident) -> TokenStream {
     let vis = &input.vis;
     let trait_name = &input.ident;
+    let client_name = Ident::new(&(trait_name.to_string() + "Client"), trait_name.span());
 
     let methods: Vec<_> = input
         .methods()
@@ -286,11 +287,11 @@ fn make_client(input: &ItemTrait, module_name: &Ident) -> TokenStream {
 
     quote! {
         #[derive(::core::fmt::Debug)]
-        #vis struct Client<T: ::ipc::tokio::io::AsyncWriteExt + ::core::marker::Unpin + ::core::marker::Send> {
+        #vis struct #client_name<T: ::ipc::tokio::io::AsyncWriteExt + ::core::marker::Unpin + ::core::marker::Send> {
             inner: ::ipc::Connection<#module_name::MethodCall, T>,
         }
 
-        impl<T: ::ipc::tokio::io::AsyncWriteExt + ::core::marker::Unpin + ::core::marker::Send> #trait_name for Client<T> {
+        impl<T: ::ipc::tokio::io::AsyncWriteExt + ::core::marker::Unpin + ::core::marker::Send> #trait_name for #client_name<T> {
             #(#methods)*
         }
     }
