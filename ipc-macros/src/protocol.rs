@@ -2,12 +2,15 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse_quote, FnArg, Ident, ItemTrait, TraitItemFn, Type};
 
-use crate::utils::{FunctionEditor, ParseType, TraitEditor};
+use crate::{
+    utils::{FunctionEditor, ParseType, TraitEditor},
+    ProtocolArgs,
+};
 
-pub fn protocol(input: ItemTrait) -> TokenStream {
+pub fn protocol(args: ProtocolArgs, input: ItemTrait) -> TokenStream {
     let modname = Ident::new(&(input.ident.to_string() + "_inner"), input.ident.span());
     let inner_module = inner_module::make(&input, &modname);
-    let client = make_client(&input, &modname);
+    let client = make_client(args, &input, &modname);
 
     let client_trait = make_client_trait(input.clone(), &modname);
     let server_trait = server_trait::make(input, &modname);
@@ -247,7 +250,7 @@ fn make_client_trait(mut input: ItemTrait, module_name: &Ident) -> ItemTrait {
     input
 }
 
-fn make_client(input: &ItemTrait, module_name: &Ident) -> TokenStream {
+fn make_client(args: ProtocolArgs, input: &ItemTrait, module_name: &Ident) -> TokenStream {
     let vis = &input.vis;
     let trait_name = &input.ident;
     let client_name = Ident::new(&(trait_name.to_string() + "Client"), trait_name.span());
@@ -285,6 +288,19 @@ fn make_client(input: &ItemTrait, module_name: &Ident) -> TokenStream {
         })
         .collect();
 
+    let mut additional_impls = Vec::new();
+    if let Some(socket_name) = args.abstract_socket {
+        additional_impls.push(quote! {
+            impl #client_name<::tokio::net::unix::OwnedWriteHalf> {
+                #vis fn new() -> ::std::io::Result<Self> {
+                    ::core::result::Result::Ok(Self {
+                        inner: ::ipc::Connection::from_unix_address(&<::std::os::unix::net::SocketAddr as ::std::os::linux::net::SocketAddrExt>::from_abstract_name(#socket_name)?)?,
+                    })
+                }
+            }
+        });
+    }
+
     quote! {
         #[derive(::core::fmt::Debug)]
         #[allow(clippy::module_name_repetitions)]
@@ -295,6 +311,8 @@ fn make_client(input: &ItemTrait, module_name: &Ident) -> TokenStream {
         impl<T: ::ipc::tokio::io::AsyncWriteExt + ::core::marker::Unpin + ::core::marker::Send> #trait_name for #client_name<T> {
             #(#methods)*
         }
+
+        #(#additional_impls)*
     }
 }
 

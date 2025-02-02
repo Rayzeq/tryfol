@@ -53,4 +53,8 @@ mod tests {
         async fn func1(&self) -> ipc::Result<u32>;
         async fn func2(&self) -> ipc::Result<u32>;
     }
+
+    #[allow(unused)]
+    #[protocol(abstract_socket = "test")]
+    pub trait ProtocolWithAbstractSocketName {}
 }
