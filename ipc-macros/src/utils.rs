@@ -5,6 +5,10 @@ use syn::{
     Token, TraitBound, TraitItem, TraitItemFn, Type, TypeImplTrait, TypeParamBound, TypePath,
 };
 
+pub trait IdentEditor {
+    fn with_name(&self, name: &str) -> Self;
+}
+
 pub trait TraitEditor {
     fn methods(&self) -> impl Iterator<Item = &TraitItemFn>;
     fn methods_mut(&mut self) -> impl Iterator<Item = &mut TraitItemFn>;
@@ -40,6 +44,12 @@ pub struct TypeResult<T: Deref<Target = Path>> {
 
 pub struct TypeStream<T: Deref<Target = Punctuated<GenericArgument, Token![,]>>> {
     args: T,
+}
+
+impl IdentEditor for Ident {
+    fn with_name(&self, name: &str) -> Self {
+        Ident::new(name, self.span())
+    }
 }
 
 impl TraitEditor for ItemTrait {
