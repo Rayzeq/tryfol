@@ -19,13 +19,6 @@ pub fn derive_write(input: TokenStream) -> TokenStream {
     TokenStream::from(rw::derive_write(input))
 }
 
-#[derive(Default, FromMeta)]
-#[darling(default)]
-struct ProtocolArgs {
-    #[darling(default)]
-    abstract_socket: Option<String>,
-}
-
 #[proc_macro_attribute]
 pub fn protocol(args: TokenStream, input: TokenStream) -> TokenStream {
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {
@@ -34,7 +27,7 @@ pub fn protocol(args: TokenStream, input: TokenStream) -> TokenStream {
             return TokenStream::from(Error::from(e).write_errors());
         }
     };
-    let args = match ProtocolArgs::from_list(&attr_args) {
+    let args = match protocol::Arguments::from_list(&attr_args) {
         Ok(v) => v,
         Err(e) => {
             return TokenStream::from(e.write_errors());
@@ -42,7 +35,7 @@ pub fn protocol(args: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     let input = parse_macro_input!(input as ItemTrait);
-    TokenStream::from(protocol::protocol(args, input))
+    TokenStream::from(protocol::Protocol::new(input, args).make())
 }
 
 #[proc_macro]
