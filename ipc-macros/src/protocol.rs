@@ -15,8 +15,6 @@ pub struct Arguments {
     client_name: Option<String>,
     #[darling(default)]
     server_name: Option<String>,
-    #[darling(default)]
-    module_name: Option<String>,
 }
 
 pub struct Protocol {
@@ -43,11 +41,8 @@ impl Protocol {
                 .server_name
                 .unwrap_or_else(|| base_name.to_string() + "Server"),
         );
-        let module_name = base_name.with_name(
-            &args
-                .module_name
-                .unwrap_or_else(|| "__".to_owned() + &base_name.to_string() + "_inner"),
-        );
+        let module_name =
+            base_name.with_name(&("__".to_owned() + &base_name.to_string() + "_inner"));
 
         Self {
             input,
