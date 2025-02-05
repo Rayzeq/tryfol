@@ -13,8 +13,8 @@ categories = [ "os", "gui" ]
 [dependencies]
 log.workspace = true
 anyhow.workspace = true
+tokio = { workspace = true, features = ["full"] }
 
-tokio = { version = "1.40", features = ["full"] }
 zbus = { version = "5.0.1", default-features = false, features = ["tokio"] }
 chrono = { version = "0.4.38", features = ["unstable-locales"] }
 grass = "0.13.2"

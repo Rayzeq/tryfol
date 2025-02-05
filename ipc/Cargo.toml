@@ -8,10 +8,10 @@ ipc-macros.workspace = true
 # not used directly, but needed by ipc-macros
 anyhow.workspace = true
 log.workspace = true
+tokio = { workspace = true, features = ["io-util", "net", "sync", "rt"] }
 
 thiserror = "2"
-tokio = { version = "1", features = ["io-util", "net", "sync", "rt"] }
 futures = "0.3"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros"] }
+tokio = { workspace = true, features = ["macros"] }

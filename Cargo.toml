@@ -8,3 +8,4 @@ ipc-macros.path = "ipc-macros"
 
 anyhow = "1"
 log = "0.4"
+tokio = { version = "1" }
