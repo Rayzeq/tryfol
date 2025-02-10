@@ -330,6 +330,76 @@ impl Protocol {
         let handle_client_method = self.make_handle_client_method(packet_branches);
         input.items.push(handle_client_method);
 
+        if let Some(socket_name) = &self.abstract_socket {
+            let server_trait_name = &self.server_name;
+            let serve_method = parse_quote! {
+                fn serve(self) -> impl ::std::future::Future<Output = Result<::std::convert::Infallible, ::std::io::Error>>
+                        + ::core::marker::Send
+                where
+                    Self: ::core::clone::Clone + ::core::marker::Send + ::core::marker::Sync + 'static
+                {
+                    struct CancelGuard {
+                        tasks: ::std::vec::Vec<::ipc::tokio::task::JoinHandle<()>>,
+                    }
+
+                    impl CancelGuard {
+                        pub fn add(&mut self, task: ::ipc::tokio::task::JoinHandle<()>) {
+                            self.tasks.push(task);
+                        }
+
+                        pub fn cleanup(&mut self) {
+                            self.tasks.retain(|task| !task.is_finished());
+                        }
+                    }
+
+                    impl ::core::ops::Drop for CancelGuard {
+                        fn drop(&mut self) {
+                            for task in &self.tasks {
+                                task.abort();
+                            }
+                        }
+                    }
+
+                    async move {
+                        const TIMEOUT: ::core::time::Duration = ::core::time::Duration::from_secs(60);
+
+                        let addr = <::std::os::unix::net::SocketAddr as ::std::os::linux::net::SocketAddrExt>::from_abstract_name(#socket_name)?;
+                        let listener = ::std::os::unix::net::UnixListener::bind_addr(&addr)?;
+                        listener.set_nonblocking(true)?;
+                        let listener = ::ipc::tokio::net::UnixListener::from_std(listener)?;
+
+                        let mut guard = CancelGuard { tasks: ::std::vec::Vec::new() };
+
+                        let timer = ::ipc::tokio::time::sleep(TIMEOUT);
+                        ::ipc::tokio::pin!(timer);
+                        loop {
+                            ::ipc::tokio::select! {
+                                result = listener.accept() => {
+                                    match result {
+                                        ::core::result::Result::Ok((stream, _)) => {
+                                            let (rx, tx) = stream.into_split();
+                                            let this = <Self as ::core::clone::Clone>::clone(&self);
+                                            let task = ::ipc::tokio::task::spawn(<Self as #server_trait_name>::handle_client(this, rx, tx));
+                                            guard.add(task);
+                                        }
+                                        ::core::result::Result::Err(e) => {
+                                            ::log::error!("Error accepting client: {e}");
+                                        }
+                                    }
+                                },
+                                () = &mut timer => {
+                                    // Timeout reached, cleanup dead tasks
+                                    guard.cleanup();
+                                    timer.as_mut().reset(::ipc::tokio::time::Instant::now() + TIMEOUT);
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+            input.items.push(serve_method);
+        }
+
         input.methods_mut().for_each(|method| {
             if let Some(mut result) = method.sig.output.as_result_mut() {
                 if let Some(mut stream) = result.ok_mut().as_stream_mut() {
