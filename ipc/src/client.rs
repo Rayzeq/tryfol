@@ -1,6 +1,6 @@
 use crate::{
     errors::ClientError,
-    packet::{self, Clientbound},
+    packet::{self, Clientbound, PacketSender},
     rw::{Read, Write},
     AnyCall, LongMethod, Method, Response,
 };
@@ -25,7 +25,7 @@ use tokio::{
 
 #[derive(Debug, Clone)]
 pub struct Connection<T: AnyCall, TX: AsyncWriteExt + Unpin + Send> {
-    stream: Arc<Mutex<TX>>,
+    stream: PacketSender<TX>,
     next_call_id: Arc<AtomicU64>,
     channels: Arc<Mutex<HashMap<u64, mpsc::UnboundedSender<T::Response>>>>,
 }
@@ -89,7 +89,7 @@ where
         });
 
         Self {
-            stream: Arc::new(Mutex::new(tx)),
+            stream: PacketSender::new(tx),
             next_call_id: Arc::new(AtomicU64::new(0)),
             channels,
         }
@@ -168,11 +168,7 @@ where
         let (tx, rx) = mpsc::unbounded_channel();
         self.channels.lock().await.insert(call_id, tx);
 
-        let packet: Clientbound<T> = packet::Clientbound {
-            call_id,
-            payload: method.into(),
-        };
-        let result = packet.write(&mut *self.stream.lock().await).await;
+        let result = self.stream.write(call_id, method.into()).await;
         if let Err(e) = result {
             self.channels.lock().await.remove(&call_id);
             return Err(ClientError::Call(e));
