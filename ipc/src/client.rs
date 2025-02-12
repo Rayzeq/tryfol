@@ -168,7 +168,11 @@ where
         let (tx, rx) = mpsc::unbounded_channel();
         self.channels.lock().await.insert(call_id, tx);
 
-        let result = self.stream.write(call_id, method.into()).await;
+        let packet: Clientbound<T> = packet::Clientbound {
+            call_id,
+            payload: method.into(),
+        };
+        let result = self.stream.write(packet).await;
         if let Err(e) = result {
             self.channels.lock().await.remove(&call_id);
             return Err(ClientError::Call(e));

@@ -36,7 +36,22 @@ impl<TX: AsyncWrite + Unpin + Send> PacketSender<TX> {
         }
     }
 
-    pub async fn write<T>(&self, id: u64, payload: T) -> anyhow::Result<()>
+    pub async fn write<T>(&self, payload: Clientbound<T>) -> anyhow::Result<()>
+    where
+        T: Write + Sync,
+        T::Error: Send + Sync + 'static,
+        anyhow::Error: From<T::Error>,
+    {
+        let mut inner = self.inner.lock().await;
+        Write::write(&payload, &mut *inner).await?;
+        inner.flush().await?;
+
+        // drop "early" to satisfy clippy
+        drop(inner);
+        Ok(())
+    }
+
+    pub async fn write_with_id<T>(&self, id: u64, payload: T) -> anyhow::Result<()>
     where
         T: Write + Send,
         anyhow::Error: From<T::Error>,

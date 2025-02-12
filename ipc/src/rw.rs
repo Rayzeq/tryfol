@@ -90,7 +90,7 @@ impl Read for String {
     }
 }
 
-impl<'a, T, U> Read for Cow<'a, T>
+impl<T, U> Read for Cow<'_, T>
 where
     T: ToOwned<Owned = U> + ?Sized,
     U: Read,
@@ -218,7 +218,7 @@ impl Write for String {
     }
 }
 
-impl<'a, T> Write for Cow<'a, T>
+impl<T> Write for Cow<'_, T>
 where
     T: ToOwned + Write + ?Sized + Sync,
     T::Owned: Write<Error = T::Error> + Sync,
