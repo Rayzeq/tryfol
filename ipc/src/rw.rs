@@ -1,4 +1,5 @@
-use std::{borrow::Cow, convert::Infallible, future::Future, io, string::FromUtf8Error};
+use anyhow::Context;
+use std::{borrow::Cow, convert::Infallible, future::Future, io};
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -66,24 +67,19 @@ simple_read_impl!(i16, read_i16);
 simple_read_impl!(i32, read_i32);
 simple_read_impl!(i64, read_i64);
 
-#[derive(Debug, Error)]
-pub enum ReadStringError {
-    #[error(transparent)]
-    Io(#[from] io::Error),
-    #[error(transparent)]
-    Utf8(#[from] FromUtf8Error),
-}
-
 impl Read for String {
-    type Error = ReadStringError;
+    type Error = anyhow::Error;
 
     async fn read(stream: &mut (impl AsyncReadExt + Unpin + Send)) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {
-        let len = u64::read(stream).await?;
+        let len = u64::read(stream)
+            .await?
+            .try_into()
+            .context("String is too long for this platform")?;
 
-        let mut buf = vec![0; len as usize];
+        let mut buf = vec![0; len];
         stream.read_exact(&mut buf).await?;
 
         Ok(Self::from_utf8(buf)?)
@@ -105,29 +101,25 @@ where
     }
 }
 
-#[derive(Debug, Error)]
-pub enum ReadVectorError<T> {
-    #[error("Cannot read the length of the vector: {0}")]
-    Length(#[source] io::Error),
-    #[error("Cannot read the content of the vector: {0}")]
-    Content(#[source] T),
-}
-
 impl<T> Read for Vec<T>
 where
     T: Read + Send,
+    anyhow::Error: From<T::Error>,
 {
-    type Error = ReadVectorError<<T as Read>::Error>;
+    type Error = anyhow::Error;
 
     async fn read(stream: &mut (impl AsyncReadExt + Unpin + Send)) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {
-        let len = u64::read(stream).await.map_err(ReadVectorError::Length)? as usize;
+        let len: usize = u64::read(stream)
+            .await?
+            .try_into()
+            .context("Too many elements for this platform")?;
 
         let mut result = Self::with_capacity(len);
         for _ in 0..len {
-            result.push(T::read(stream).await.map_err(ReadVectorError::Content)?);
+            result.push(T::read(stream).await?);
         }
 
         Ok(result)
