@@ -264,8 +264,19 @@ where
     }
 }
 
-ipc_macros::__impl_rw_for_result!();
-ipc_macros::__impl_rw_for_option!();
+ipc_macros::__impl_rw_for_external! {
+    enum Result<T, E> {
+        Ok(T),
+        Err(E)
+    }
+}
+
+ipc_macros::__impl_rw_for_external! {
+    enum Option<T> {
+            Some(T),
+            None
+        }
+}
 
 #[cfg(test)]
 mod tests {
