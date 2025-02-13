@@ -228,31 +228,21 @@ where
     }
 }
 
-#[derive(Debug, Error)]
-pub enum WriteVectorError<T> {
-    #[error("Cannot write the length of the vector: {0}")]
-    Length(#[source] io::Error),
-    #[error("Cannot write the content of the vector: {0}")]
-    Content(#[source] T),
-}
-
 impl<T> Write for [T]
 where
     T: Write + Sync,
+    anyhow::Error: From<T::Error>,
 {
-    type Error = WriteVectorError<<T as Write>::Error>;
+    type Error = anyhow::Error;
 
     async fn write(
         &self,
         stream: &mut (impl AsyncWriteExt + Unpin + Send),
     ) -> Result<(), Self::Error> {
-        (self.len() as u64)
-            .write(stream)
-            .await
-            .map_err(WriteVectorError::Length)?;
+        (self.len() as u64).write(stream).await?;
 
         for e in self {
-            e.write(stream).await.map_err(WriteVectorError::Content)?;
+            e.write(stream).await?;
         }
 
         Ok(())
@@ -262,8 +252,9 @@ where
 impl<T> Write for Vec<T>
 where
     T: Write + Sync,
+    anyhow::Error: From<T::Error>,
 {
-    type Error = WriteVectorError<<T as Write>::Error>;
+    type Error = anyhow::Error;
 
     async fn write(
         &self,
