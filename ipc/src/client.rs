@@ -17,14 +17,14 @@ use std::{
     },
 };
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncRead, AsyncWrite},
     net::{unix::OwnedWriteHalf, UnixStream},
     spawn,
     sync::{mpsc, Mutex},
 };
 
 #[derive(Debug, Clone)]
-pub struct Connection<T: AnyCall, TX: AsyncWriteExt + Unpin + Send> {
+pub struct Connection<T: AnyCall, TX: AsyncWrite + Unpin + Send> {
     stream: PacketSender<TX>,
     next_call_id: Arc<AtomicU64>,
     channels: Arc<Mutex<HashMap<u64, mpsc::UnboundedSender<T::Response>>>>,
@@ -50,11 +50,11 @@ where
     }
 }
 
-impl<T: AnyCall, TX: AsyncWriteExt + Unpin + Send> Connection<T, TX>
+impl<T: AnyCall, TX: AsyncWrite + Unpin + Send> Connection<T, TX>
 where
     anyhow::Error: From<<T as Write>::Error> + From<<T::Response as Read>::Error>,
 {
-    pub fn new<RX: AsyncReadExt + Unpin + Send + 'static>(mut rx: RX, tx: TX) -> Self {
+    pub fn new<RX: AsyncRead + Unpin + Send + 'static>(mut rx: RX, tx: TX) -> Self {
         let channels: Arc<Mutex<HashMap<_, mpsc::UnboundedSender<_>>>> = Arc::default();
         let channels2 = Arc::clone(&channels);
 

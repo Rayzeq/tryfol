@@ -25,7 +25,7 @@ pub fn derive_read(input: DeriveInput) -> TokenStream {
         impl #impl_generics ::ipc::rw::Read for #name #ty_generics #where_clause {
             type Error = ::anyhow::Error;
 
-            async fn read(stream: &mut (impl ::tokio::io::AsyncReadExt + ::core::marker::Unpin + ::core::marker::Send)) -> ::core::result::Result<Self, <Self as ::ipc::rw::Read>::Error>
+            async fn read(stream: &mut (impl ::tokio::io::AsyncRead + ::core::marker::Unpin + ::core::marker::Send)) -> ::core::result::Result<Self, <Self as ::ipc::rw::Read>::Error>
             where
                 Self: ::core::marker::Sized,
             {

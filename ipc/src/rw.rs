@@ -1,13 +1,13 @@
 use anyhow::Context;
 use std::{borrow::Cow, convert::Infallible, future::Future, io};
 use thiserror::Error;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub trait Read {
     type Error;
 
     fn read(
-        stream: &mut (impl AsyncReadExt + Unpin + Send),
+        stream: &mut (impl AsyncRead + Unpin + Send),
     ) -> impl Future<Output = Result<Self, Self::Error>> + Send
     where
         Self: Sized;
@@ -18,7 +18,7 @@ pub trait Write {
 
     fn write(
         &self,
-        stream: &mut (impl AsyncWriteExt + Unpin + Send),
+        stream: &mut (impl AsyncWrite + Unpin + Send),
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
@@ -32,7 +32,7 @@ pub struct InvalidDiscriminantError {
 impl Read for () {
     type Error = Infallible;
 
-    async fn read(_stream: &mut (impl AsyncReadExt + Unpin + Send)) -> Result<Self, Self::Error>
+    async fn read(_stream: &mut (impl AsyncRead + Unpin + Send)) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {
@@ -45,9 +45,7 @@ macro_rules! simple_read_impl {
         impl Read for $type {
             type Error = io::Error;
 
-            async fn read(
-                stream: &mut (impl AsyncReadExt + Unpin + Send),
-            ) -> Result<Self, Self::Error>
+            async fn read(stream: &mut (impl AsyncRead + Unpin + Send)) -> Result<Self, Self::Error>
             where
                 Self: Sized,
             {
@@ -70,7 +68,7 @@ simple_read_impl!(i64, read_i64);
 impl Read for String {
     type Error = anyhow::Error;
 
-    async fn read(stream: &mut (impl AsyncReadExt + Unpin + Send)) -> Result<Self, Self::Error>
+    async fn read(stream: &mut (impl AsyncRead + Unpin + Send)) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {
@@ -93,7 +91,7 @@ where
 {
     type Error = <U as Read>::Error;
 
-    async fn read(stream: &mut (impl AsyncReadExt + Unpin + Send)) -> Result<Self, Self::Error>
+    async fn read(stream: &mut (impl AsyncRead + Unpin + Send)) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {
@@ -108,7 +106,7 @@ where
 {
     type Error = anyhow::Error;
 
-    async fn read(stream: &mut (impl AsyncReadExt + Unpin + Send)) -> Result<Self, Self::Error>
+    async fn read(stream: &mut (impl AsyncRead + Unpin + Send)) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {
@@ -134,7 +132,7 @@ where
 
     async fn write(
         &self,
-        stream: &mut (impl AsyncWriteExt + Unpin + Send),
+        stream: &mut (impl AsyncWrite + Unpin + Send),
     ) -> Result<(), Self::Error> {
         T::write(self, stream).await
     }
@@ -145,7 +143,7 @@ impl Write for () {
 
     async fn write(
         &self,
-        _stream: &mut (impl AsyncWriteExt + Unpin + Send),
+        _stream: &mut (impl AsyncWrite + Unpin + Send),
     ) -> Result<(), Self::Error> {
         Ok(())
     }
@@ -158,7 +156,7 @@ macro_rules! simple_write_impl {
 
             async fn write(
                 &self,
-                stream: &mut (impl AsyncWriteExt + Unpin + Send),
+                stream: &mut (impl AsyncWrite + Unpin + Send),
             ) -> Result<(), Self::Error> {
                 stream.$method(*self).await
             }
@@ -181,7 +179,7 @@ impl Write for &str {
 
     async fn write(
         &self,
-        stream: &mut (impl AsyncWriteExt + Unpin + Send),
+        stream: &mut (impl AsyncWrite + Unpin + Send),
     ) -> Result<(), Self::Error> {
         (self.len() as u64).write(stream).await?;
         stream.write_all(self.as_bytes()).await
@@ -193,7 +191,7 @@ impl Write for str {
 
     async fn write(
         &self,
-        stream: &mut (impl AsyncWriteExt + Unpin + Send),
+        stream: &mut (impl AsyncWrite + Unpin + Send),
     ) -> Result<(), Self::Error> {
         (&self).write(stream).await
     }
@@ -204,7 +202,7 @@ impl Write for String {
 
     async fn write(
         &self,
-        stream: &mut (impl AsyncWriteExt + Unpin + Send),
+        stream: &mut (impl AsyncWrite + Unpin + Send),
     ) -> Result<(), Self::Error> {
         self.as_str().write(stream).await
     }
@@ -219,7 +217,7 @@ where
 
     async fn write(
         &self,
-        stream: &mut (impl AsyncWriteExt + Unpin + Send),
+        stream: &mut (impl AsyncWrite + Unpin + Send),
     ) -> Result<(), Self::Error> {
         match self {
             Cow::Borrowed(v) => v.write(stream).await,
@@ -237,7 +235,7 @@ where
 
     async fn write(
         &self,
-        stream: &mut (impl AsyncWriteExt + Unpin + Send),
+        stream: &mut (impl AsyncWrite + Unpin + Send),
     ) -> Result<(), Self::Error> {
         (self.len() as u64).write(stream).await?;
 
@@ -258,7 +256,7 @@ where
 
     async fn write(
         &self,
-        stream: &mut (impl AsyncWriteExt + Unpin + Send),
+        stream: &mut (impl AsyncWrite + Unpin + Send),
     ) -> Result<(), Self::Error> {
         self.as_slice().write(stream).await
     }

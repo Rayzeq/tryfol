@@ -432,8 +432,8 @@ impl Protocol {
         parse_quote! {
             fn handle_client(
                 self,
-                mut rx: impl ::ipc::tokio::io::AsyncReadExt + ::core::marker::Unpin + ::core::marker::Send,
-                tx: impl ::ipc::tokio::io::AsyncWriteExt + ::core::marker::Unpin + ::core::marker::Send + 'static,
+                mut rx: impl ::ipc::tokio::io::AsyncRead + ::core::marker::Unpin + ::core::marker::Send,
+                tx: impl ::ipc::tokio::io::AsyncWrite + ::core::marker::Unpin + ::core::marker::Send + 'static,
             ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send
             where
                 Self: ::core::clone::Clone + ::core::marker::Send + ::core::marker::Sync + 'static,
