@@ -561,7 +561,7 @@ impl Protocol {
 
 fn is_stream(ty: &impl ParseType) -> bool {
     ty.as_result()
-        .map_or(false, |result| result.ok().as_stream().is_some())
+        .is_some_and(|result| result.ok().as_stream().is_some())
 }
 
 fn get_response_type(method: &TraitItemFn) -> Type {

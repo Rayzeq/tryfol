@@ -48,7 +48,7 @@ pub struct TypeStream<T: Deref<Target = Punctuated<GenericArgument, Token![,]>>>
 
 impl IdentEditor for Ident {
     fn with_name(&self, name: &str) -> Self {
-        Ident::new(name, self.span())
+        Self::new(name, self.span())
     }
 }
 
@@ -296,11 +296,14 @@ impl<T: Deref<Target = Path>> TypeResult<T> {
     }
 
     fn args(&self) -> &Punctuated<GenericArgument, Token![,]> {
-        // unwrap: ParseType::as_result guarantees that there is at least one segment
+        #[expect(
+            clippy::unwrap_used,
+            reason = "ParseType::as_result guarantees that there is at least one segment"
+        )]
         let arguments = &self.path.segments.last().unwrap().arguments;
         let PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }) = arguments
         else {
-            panic!("ParseType::as_result guarantees that arguments are bracketed")
+            unreachable!("ParseType::as_result guarantees that arguments are bracketed")
         };
 
         args
@@ -310,18 +313,24 @@ impl<T: Deref<Target = Path>> TypeResult<T> {
     where
         T: DerefMut<Target = Path>,
     {
-        // unwrap: ParseType::as_result guarantees that there is at least one segment
+        #[expect(
+            clippy::unwrap_used,
+            reason = "ParseType::as_result guarantees that there is at least one segment"
+        )]
         let arguments = &mut self.path.segments.last_mut().unwrap().arguments;
         let PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }) = arguments
         else {
-            panic!("ParseType::as_result guarantees that arguments are bracketed")
+            unreachable!("ParseType::as_result guarantees that arguments are bracketed")
         };
 
         args
     }
 
     pub fn ok(&self) -> &Type {
-        // unwrap: ParseType::as_result guarantees that there is at least one type argument
+        #[expect(
+            clippy::unwrap_used,
+            reason = "ParseType::as_result guarantees that there is at least one type argument"
+        )]
         self.args().types().next().unwrap()
     }
 
@@ -329,7 +338,10 @@ impl<T: Deref<Target = Path>> TypeResult<T> {
     where
         T: DerefMut<Target = Path>,
     {
-        // unwrap: ParseType::as_result guarantees that there is at least one type argument
+        #[expect(
+            clippy::unwrap_used,
+            reason = "ParseType::as_result guarantees that there is at least one type argument"
+        )]
         self.args_mut().types_mut().next().unwrap()
     }
 
@@ -353,11 +365,14 @@ impl<T: Deref<Target = Path>> TypeResult<T> {
 
 impl<T: Deref<Target = Punctuated<GenericArgument, Token![,]>>> TypeStream<T> {
     pub fn item(&self) -> &Type {
+        #[expect(
+            clippy::unwrap_used,
+            reason = "ParseType::as_stream guarantees that there is an associated item named `Item`"
+        )]
         &self
             .args
             .associated_types()
             .find(|ty| ty.ident == "Item")
-            // unwrap: ParseType::as_stream guarantees that there is an associated item named `Item`
             .unwrap()
             .ty
     }
@@ -366,11 +381,14 @@ impl<T: Deref<Target = Punctuated<GenericArgument, Token![,]>>> TypeStream<T> {
     where
         T: DerefMut<Target = Punctuated<GenericArgument, Token![,]>>,
     {
+        #[expect(
+            clippy::unwrap_used,
+            reason = "ParseType::as_stream guarantees that there is an associated item named `Item`"
+        )]
         &mut self
             .args
             .associated_types_mut()
             .find(|ty| ty.ident == "Item")
-            // unwrap: ParseType::as_stream guarantees that there is an associated item named `Item`
             .unwrap()
             .ty
     }

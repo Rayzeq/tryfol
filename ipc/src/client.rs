@@ -75,9 +75,8 @@ where
                         }
                     }
                     Err(e) => {
-                        if !e
-                            .downcast_ref::<io::Error>()
-                            .is_some_and(|e| e.kind() == ErrorKind::UnexpectedEof)
+                        if e.downcast_ref::<io::Error>()
+                            .is_none_or(|e| e.kind() != ErrorKind::UnexpectedEof)
                         {
                             error!("Error while receiving response: {e}");
                         }
@@ -138,9 +137,8 @@ where
                     // the sender has been dropped because the server closed
                     if error_sent {
                         return None;
-                    } else {
-                        return Some((Err(ClientError::Connection), (receiver, channels, true)));
                     }
+                    return Some((Err(ClientError::Connection), (receiver, channels, true)));
                 };
                 let response: Option<M::Response> = match response.try_into() {
                     Ok(x) => x,

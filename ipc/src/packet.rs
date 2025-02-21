@@ -38,7 +38,7 @@ impl<TX: AsyncWrite + Unpin + Send> PacketSender<TX> {
 
     pub async fn write<T>(&self, payload: Clientbound<T>) -> anyhow::Result<()>
     where
-        T: Write + Sync,
+        T: Write + Send + Sync,
         T::Error: Send + Sync + 'static,
         anyhow::Error: From<T::Error>,
     {
