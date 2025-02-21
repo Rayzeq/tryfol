@@ -1,10 +1,10 @@
 use crate::{
+    AnyCall, LongMethod, Method, Response,
     errors::ClientError,
     packet::{self, Clientbound, PacketSender},
     rw::{Read, Write},
-    AnyCall, LongMethod, Method, Response,
 };
-use futures::{stream, Stream};
+use futures::{Stream, stream};
 use log::{error, warn};
 use std::{
     collections::HashMap,
@@ -12,15 +12,15 @@ use std::{
     io::{self, ErrorKind},
     os::unix::net::{SocketAddr, UnixStream as StdUnixStream},
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
 };
 use tokio::{
     io::{AsyncRead, AsyncWrite},
-    net::{unix::OwnedWriteHalf, UnixStream},
+    net::{UnixStream, unix::OwnedWriteHalf},
     spawn,
-    sync::{mpsc, Mutex},
+    sync::{Mutex, mpsc},
 };
 
 #[derive(Debug, Clone)]

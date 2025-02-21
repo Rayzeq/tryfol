@@ -1,22 +1,21 @@
 use crate::HasTooltip;
 use gtk4::{
-    self as gtk,
-    glib::{self, clone, Propagation},
+    self as gtk, Button, EventControllerScroll, EventControllerScrollFlags, Label, Orientation,
+    glib::{self, Propagation, clone},
     prelude::{BoxExt, ButtonExt, WidgetExt},
-    Button, EventControllerScroll, EventControllerScrollFlags, Label, Orientation,
 };
 use std::borrow::Cow;
 use wireplumber::{
     core::ObjectFeatures,
     lib::glib::{
-        prelude::{IsA, ObjectExt},
         Value, Variant, VariantDict,
+        prelude::{IsA, ObjectExt},
     },
     plugin::{Plugin, PluginFeatures},
     prelude::*,
     pw::{Device, GlobalProxy, Node},
     registry::{ConstraintType, ConstraintVerb, Interest, ObjectInterest, ObjectManager},
-    spa::{libspa::utils::Id, SpaPod},
+    spa::{SpaPod, libspa::utils::Id},
 };
 
 pub fn new() -> gtk::Box {

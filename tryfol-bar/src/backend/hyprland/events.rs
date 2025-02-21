@@ -1,6 +1,6 @@
 use super::{WindowAddress, Workspace};
 use crate::Split;
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use async_stream::stream;
 use futures::Stream;
 use std::io;

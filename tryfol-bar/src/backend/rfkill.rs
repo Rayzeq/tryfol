@@ -154,7 +154,8 @@ impl Manager {
 
 unsafe fn any_as_u8_slice<T: Sized>(p: &mut T) -> &mut [u8] {
     use core::{mem, ptr, slice};
-    slice::from_raw_parts_mut(ptr::from_mut(p).cast::<u8>(), mem::size_of::<T>())
+
+    unsafe { slice::from_raw_parts_mut(ptr::from_mut(p).cast::<u8>(), mem::size_of::<T>()) }
 }
 
 impl From<u8> for Type {

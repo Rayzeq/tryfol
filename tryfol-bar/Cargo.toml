@@ -1,7 +1,7 @@
 [package]
 name = "tryfol-bar"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "A custom Wayland bar written in Rust + GTK4"
 license = "MPL-2.0"
 repository = "https://github.com/Rayzeq/tryfol"

@@ -1,11 +1,11 @@
 use crate::{
-    backend::battery::{self, Status},
     Hoverable,
+    backend::battery::{self, Status},
 };
 use gtk::{
+    Label, Orientation, Revealer, RevealerTransitionType,
     glib::{self, ControlFlow},
     prelude::*,
-    Label, Orientation, Revealer, RevealerTransitionType,
 };
 use gtk4 as gtk;
 use lazy_static::lazy_static;

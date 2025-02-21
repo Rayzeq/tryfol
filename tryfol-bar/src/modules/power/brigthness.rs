@@ -1,10 +1,10 @@
-use crate::{backend::logind::SessionProxy, Scrollable};
+use crate::{Scrollable, backend::logind::SessionProxy};
 use anyhow::Context;
 use gtk::{
-    gio::{Cancellable, Socket},
-    glib::{self, clone, IOCondition, Priority},
-    prelude::*,
     Label,
+    gio::{Cancellable, Socket},
+    glib::{self, IOCondition, Priority, clone},
+    prelude::*,
 };
 use gtk4::{self as gtk, glib::JoinHandle};
 use log::{error, warn};

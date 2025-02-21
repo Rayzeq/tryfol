@@ -1,5 +1,5 @@
 use crate::{FormatFixed, HasTooltip, Hoverable};
-use gtk::{glib, prelude::*, Label, Orientation, Revealer, RevealerTransitionType};
+use gtk::{Label, Orientation, Revealer, RevealerTransitionType, glib, prelude::*};
 use gtk4 as gtk;
 use log::error;
 use psutil::{

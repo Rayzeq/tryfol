@@ -2,7 +2,7 @@
 #![allow(clippy::future_not_send)]
 
 use gtk::{
-    gdk::Display, glib, prelude::*, Align, Application, ApplicationWindow, CssProvider, Orientation,
+    Align, Application, ApplicationWindow, CssProvider, Orientation, gdk::Display, glib, prelude::*,
 };
 use gtk4 as gtk;
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
@@ -101,7 +101,9 @@ fn load_css(_: &Application) {
 }
 
 fn main() -> glib::ExitCode {
-    env::set_var("RUST_BACKTRACE", "1");
+    unsafe {
+        env::set_var("RUST_BACKTRACE", "1");
+    }
     simple_logger::init_with_level(log::Level::Warn).unwrap();
 
     let app = Application::builder()

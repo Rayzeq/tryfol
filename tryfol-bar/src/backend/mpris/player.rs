@@ -5,10 +5,10 @@ use gtk4::glib;
 use log::{error, warn};
 use std::{borrow::Cow, collections::HashMap, future::Future};
 use zbus::{
+    Connection,
     fdo::{DBusProxy, PropertiesChangedArgs, PropertiesProxy},
     names::{InterfaceName, OwnedBusName},
     zvariant::{self, Value},
-    Connection,
 };
 
 #[derive(Debug, Clone)]

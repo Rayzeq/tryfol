@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    parse_quote, spanned::Spanned, Data, DeriveInput, Fields, GenericParam, Generics, Ident, Index,
-    Path, TypeParamBound, WherePredicate,
+    Data, DeriveInput, Fields, GenericParam, Generics, Ident, Index, Path, TypeParamBound,
+    WherePredicate, parse_quote, spanned::Spanned,
 };
 
 pub fn derive_read(input: DeriveInput) -> TokenStream {
@@ -133,7 +133,7 @@ fn read_code(name: &Ident, data: &Data) -> TokenStream {
 
 fn read_code_for_fields(this: &Path, fields: &Fields) -> TokenStream {
     match fields {
-        Fields::Named(ref fields) => {
+        Fields::Named(fields) => {
             let recurse = fields.named.iter().map(|f| {
                 let name = &f.ident;
                 let ty = &f.ty;
@@ -147,7 +147,7 @@ fn read_code_for_fields(this: &Path, fields: &Fields) -> TokenStream {
                 }
             }
         }
-        Fields::Unnamed(ref fields) => {
+        Fields::Unnamed(fields) => {
             let recurse = fields.unnamed.iter().map(|f| {
                 let ty = &f.ty;
                 quote_spanned! {f.span()=>
@@ -163,15 +163,15 @@ fn read_code_for_fields(this: &Path, fields: &Fields) -> TokenStream {
 }
 
 fn write_code(data: &Data) -> TokenStream {
-    match *data {
-        Data::Struct(ref data) => {
+    match data {
+        Data::Struct(data) => {
             let code = write_code_for_fields(&data.fields, true);
             quote! {
                 #code;
                 ::core::result::Result::Ok(())
             }
         }
-        Data::Enum(ref data) => {
+        Data::Enum(data) => {
             if data.variants.is_empty() {
                 return quote! {
                     ::std::unreachable!("Cannot write empty enum because there is no valid discriminant");
@@ -203,7 +203,7 @@ fn write_code(data: &Data) -> TokenStream {
 
 fn write_code_for_fields(fields: &Fields, has_self: bool) -> TokenStream {
     match fields {
-        Fields::Named(ref fields) => {
+        Fields::Named(fields) => {
             let recurse = fields.named.iter().map(|f| {
                 let name = &f.ident;
 
@@ -221,7 +221,7 @@ fn write_code_for_fields(fields: &Fields, has_self: bool) -> TokenStream {
                 #(#recurse;)*
             }
         }
-        Fields::Unnamed(ref fields) => {
+        Fields::Unnamed(fields) => {
             let recurse = fields.unnamed.iter().enumerate().map(|(i, f)| {
                 if has_self {
                     let index = Index::from(i);
@@ -245,7 +245,7 @@ fn write_code_for_fields(fields: &Fields, has_self: bool) -> TokenStream {
 
 fn fields_to_pattern(fields: &Fields) -> TokenStream {
     match fields {
-        Fields::Named(ref fields) => {
+        Fields::Named(fields) => {
             let recurse = fields
                 .named
                 .iter()
@@ -254,7 +254,7 @@ fn fields_to_pattern(fields: &Fields) -> TokenStream {
                 { #(#recurse,)* }
             }
         }
-        Fields::Unnamed(ref fields) => {
+        Fields::Unnamed(fields) => {
             let recurse = fields
                 .unnamed
                 .iter()

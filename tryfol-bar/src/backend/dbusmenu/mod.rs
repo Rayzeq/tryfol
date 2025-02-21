@@ -1,10 +1,10 @@
 use futures::StreamExt;
 use gtk4::{
-    self as gtk,
+    self as gtk, Button, CheckButton, Image, Label, Orientation, Popover, PositionType, Separator,
+    Widget,
     gdk::Texture,
-    glib::{self, clone, Bytes},
+    glib::{self, Bytes, clone},
     prelude::*,
-    Button, CheckButton, Image, Label, Orientation, Popover, PositionType, Separator, Widget,
 };
 use log::{error, warn};
 use std::{
@@ -15,8 +15,8 @@ use std::{
 };
 use tokio::sync::Mutex;
 use zbus::{
-    zvariant::{self, OwnedValue},
     Connection,
+    zvariant::{self, OwnedValue},
 };
 
 mod proxy;

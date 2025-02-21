@@ -1,8 +1,8 @@
 use chrono::{Local, Locale};
 use gtk::{
+    Button, Calendar, Label, Popover,
     glib::{self, ControlFlow, DateTime},
     prelude::*,
-    Button, Calendar, Label, Popover,
 };
 use gtk4 as gtk;
 use log::error;

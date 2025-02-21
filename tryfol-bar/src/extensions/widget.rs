@@ -1,15 +1,13 @@
 use gtk::{
-    gdk,
+    EventControllerMotion, EventControllerScroll, EventControllerScrollFlags, EventSequenceState,
+    GestureClick, Tooltip, Widget, gdk,
     glib::Propagation,
     glib::{
-        self, clone,
+        self, SignalHandlerId, WeakRef, clone,
         clone::{Downgrade, Upgrade},
         object::{Cast, IsA, ObjectExt},
-        SignalHandlerId, WeakRef,
     },
     prelude::*,
-    EventControllerMotion, EventControllerScroll, EventControllerScrollFlags, EventSequenceState,
-    GestureClick, Tooltip, Widget,
 };
 use gtk4 as gtk;
 

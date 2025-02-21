@@ -1,5 +1,5 @@
 use super::{WindowAddress, WindowInfos, WorkspaceId, WorkspaceInfos};
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use std::{
     io::{self, ErrorKind, Write},
     os::unix::net::UnixStream as StdUnixStream,

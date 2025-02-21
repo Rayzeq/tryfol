@@ -6,7 +6,7 @@ mod item;
 mod proxy;
 mod watcher;
 
-pub use host::{run_host, Host};
+pub use host::{Host, run_host};
 pub use item::{Event, Item};
 pub use proxy::{Category, Orientation, Status};
 pub use watcher::Watcher;

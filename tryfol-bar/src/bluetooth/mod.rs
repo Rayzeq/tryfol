@@ -1,10 +1,9 @@
 use crate::HasTooltip;
 use futures::StreamExt;
 use gtk::{
-    gdk,
+    Button, EventControllerMotion, Label, Orientation, Revealer, RevealerTransitionType, gdk,
     glib::{self, clone},
     prelude::*,
-    Button, EventControllerMotion, Label, Orientation, Revealer, RevealerTransitionType,
 };
 use gtk4 as gtk;
 use lazy_static::lazy_static;
@@ -16,9 +15,9 @@ use std::{
 };
 use tokio::process::Command;
 use zbus::{
+    Connection,
     fdo::{ObjectManagerProxy, PropertiesProxy},
     zvariant::ObjectPath,
-    Connection,
 };
 
 mod dbus;

@@ -3,7 +3,7 @@ extern crate self as ipc;
 
 pub use anyhow;
 pub use futures;
-pub use ipc_macros::{protocol, Read, Write};
+pub use ipc_macros::{Read, Write, protocol};
 pub use log;
 use std::fmt::Debug;
 pub use tokio;

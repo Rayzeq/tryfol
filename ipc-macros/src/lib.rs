@@ -1,7 +1,7 @@
-use darling::{ast::NestedMeta, Error, FromMeta};
+use darling::{Error, FromMeta, ast::NestedMeta};
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, ItemTrait};
+use syn::{DeriveInput, ItemTrait, parse_macro_input};
 
 mod protocol;
 mod rw;

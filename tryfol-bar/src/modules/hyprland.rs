@@ -1,13 +1,13 @@
 use crate::{
-    backend::hyprland::{self, Workspace, WorkspaceId, WorkspaceInfos},
     HasTooltip, Japanese,
+    backend::hyprland::{self, Workspace, WorkspaceId, WorkspaceInfos},
 };
-use futures::{pin_mut, StreamExt};
+use futures::{StreamExt, pin_mut};
 use gtk::{
+    Button, Label,
     glib::{self, clone},
     pango::EllipsizeMode,
     prelude::*,
-    Button, Label,
 };
 use gtk4 as gtk;
 use lazy_static::lazy_static;

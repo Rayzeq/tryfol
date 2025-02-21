@@ -1,18 +1,17 @@
 use crate::{
+    Clickable, HasTooltip, Scrollable,
     backend::{
         dbusmenu::DBusMenu,
-        status_notifier::{self, run_host, Category, Event, Orientation, Status},
+        status_notifier::{self, Category, Event, Orientation, Status, run_host},
     },
-    Clickable, HasTooltip, Scrollable,
 };
 use anyhow::Context;
-use futures::{lock::Mutex, StreamExt};
+use futures::{StreamExt, lock::Mutex};
 use gtk4::{
-    self as gtk,
+    self as gtk, Image, Overlay, Widget,
     gdk::Paintable,
-    glib::{self, clone, JoinHandle},
+    glib::{self, JoinHandle, clone},
     prelude::*,
-    Image, Overlay, Widget,
 };
 use log::error;
 use std::{cmp::Ordering, collections::HashMap, convert::Infallible, rc::Rc};

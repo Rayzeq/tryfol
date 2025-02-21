@@ -1,4 +1,4 @@
-use gtk::{glib, prelude::*, Button};
+use gtk::{Button, glib, prelude::*};
 use gtk4 as gtk;
 use log::error;
 use tokio::process::Command;

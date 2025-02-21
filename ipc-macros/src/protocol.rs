@@ -2,7 +2,7 @@ use darling::FromMeta;
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_quote, FnArg, Ident, ItemTrait, TraitItem, TraitItemFn, Type};
+use syn::{FnArg, Ident, ItemTrait, TraitItem, TraitItemFn, Type, parse_quote};
 
 use crate::utils::{FunctionEditor, IdentEditor, ParseType, TraitEditor};
 

@@ -1,13 +1,13 @@
 use anyhow::Context;
 use core::fmt::{self, Display};
-use serde::{de::Error, Deserialize};
+use serde::{Deserialize, de::Error};
 use serde_repr::Deserialize_repr;
 use std::path::{Path, PathBuf};
 
 mod control;
 mod events;
 pub use control::*;
-pub use events::{events, Event};
+pub use events::{Event, events};
 
 pub type WorkspaceId = i32;
 pub type MonitorId = i128;

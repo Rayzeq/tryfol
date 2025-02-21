@@ -1,9 +1,9 @@
-use futures::{future::join_all, StreamExt};
+use futures::{StreamExt, future::join_all};
 use gtk4::glib;
 use log::error;
 use zbus::{
-    fdo::{DBusProxy, NameOwnerChangedArgs},
     Connection,
+    fdo::{DBusProxy, NameOwnerChangedArgs},
 };
 
 mod player;

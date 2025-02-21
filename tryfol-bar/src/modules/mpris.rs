@@ -1,27 +1,26 @@
 use crate::{
+    Clickable, Hoverable,
     backend::{
         hyprland,
         mpris::{LoopStatus, Mpris, PlaybackStatus, Player},
     },
-    Clickable, Hoverable,
 };
-use anyhow::{bail, Context as _};
+use anyhow::{Context as _, bail};
 use async_recursion::async_recursion;
 use core::f64;
 use futures::FutureExt;
 use gtk::{
+    Button, Label, Revealer, RevealerTransitionType,
     glib::{self, clone},
     pango::EllipsizeMode,
     prelude::*,
-    Button, Label, Revealer, RevealerTransitionType,
 };
 use gtk4::{
-    self as gtk,
+    self as gtk, Align, Image, Orientation, Overflow, Popover, Scale,
     gdk::Texture,
     gdk_pixbuf::Pixbuf,
     gio::{Cancellable, MemoryInputStream},
     glib::JoinHandle,
-    Align, Image, Orientation, Overflow, Popover, Scale,
 };
 use log::error;
 use reqwest::Url;

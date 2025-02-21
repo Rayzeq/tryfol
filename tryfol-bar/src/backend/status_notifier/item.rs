@@ -3,12 +3,12 @@
 use super::proxy::{Category, ItemProxy, Orientation, Pixmap, Status};
 use crate::backend::dbusmenu::DBusMenu;
 use anyhow::bail;
-use futures::{stream::select_all, Stream, StreamExt};
+use futures::{Stream, StreamExt, stream::select_all};
 use gtk4::{
+    IconLookupFlags, IconPaintable, IconTheme, TextDirection,
     gdk::{Display, Paintable, Texture},
     gdk_pixbuf::{Colorspace, InterpType, Pixbuf},
     glib::Bytes,
-    IconLookupFlags, IconPaintable, IconTheme, TextDirection,
 };
 use log::error;
 use std::{
@@ -16,7 +16,7 @@ use std::{
     path::{Path, PathBuf},
     pin::Pin,
 };
-use zbus::{fdo, names::BusName, Connection};
+use zbus::{Connection, fdo, names::BusName};
 
 #[derive(Debug, Clone)]
 pub struct Item {
@@ -193,7 +193,7 @@ impl Item {
     // #[zbus(property(emits_changed_signal = "false"))]
     // fn tool_tip(&self) -> zbus::fdo::Result<(String, Vec<Pixmap>, String, String)>;
 
-    pub async fn events(&self) -> zbus::Result<impl Stream<Item = Event>> {
+    pub async fn events(&self) -> zbus::Result<impl Stream<Item = Event> + use<>> {
         let title_events = self.proxy.receive_new_title().await?;
         let status_events = self.proxy.receive_new_status().await?;
         let icon_events = self.proxy.receive_new_icon().await?;

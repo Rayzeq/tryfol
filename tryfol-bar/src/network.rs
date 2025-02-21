@@ -1,9 +1,9 @@
-use crate::{backend::rfkill, FormatFixed, HasTooltip};
+use crate::{FormatFixed, HasTooltip, backend::rfkill};
 use futures::TryStreamExt;
 use gtk::{
+    EventControllerMotion, Label, Orientation, Revealer, RevealerTransitionType,
     glib::{self, clone},
     prelude::*,
-    EventControllerMotion, Label, Orientation, Revealer, RevealerTransitionType,
 };
 use gtk4 as gtk;
 use libc::RT_TABLE_MAIN;

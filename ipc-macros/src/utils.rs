@@ -1,8 +1,9 @@
 use std::ops::{Deref, DerefMut};
 use syn::{
-    parse_quote_spanned, punctuated::Punctuated, spanned::Spanned, AngleBracketedGenericArguments,
-    AssocType, GenericArgument, Ident, ItemTrait, Path, PathArguments, PathSegment, ReturnType,
-    Token, TraitBound, TraitItem, TraitItemFn, Type, TypeImplTrait, TypeParamBound, TypePath,
+    AngleBracketedGenericArguments, AssocType, GenericArgument, Ident, ItemTrait, Path,
+    PathArguments, PathSegment, ReturnType, Token, TraitBound, TraitItem, TraitItemFn, Type,
+    TypeImplTrait, TypeParamBound, TypePath, parse_quote_spanned, punctuated::Punctuated,
+    spanned::Spanned,
 };
 
 pub trait IdentEditor {

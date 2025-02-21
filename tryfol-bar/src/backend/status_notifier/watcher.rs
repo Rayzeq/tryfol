@@ -4,13 +4,13 @@ use log::error;
 use std::{collections::HashSet, sync::Arc};
 use tokio::sync::Mutex;
 use zbus::{
+    Connection,
     fdo::{DBusProxy, RequestNameFlags, RequestNameReply},
     interface,
     message::Header,
     names::{BusName, OwnedBusName},
     object_server::SignalEmitter,
     zvariant::OwnedObjectPath,
-    Connection,
 };
 
 #[derive(Debug, Clone, Default)]
