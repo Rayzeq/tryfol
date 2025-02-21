@@ -333,7 +333,7 @@ impl Protocol {
         if let Some(socket_name) = &self.abstract_socket {
             let server_trait_name = &self.server_name;
             let serve_method = parse_quote! {
-                fn serve(self) -> impl ::std::future::Future<Output = Result<::std::convert::Infallible, ::std::io::Error>>
+                fn serve(self) -> impl ::std::future::Future<Output = ::std::io::Result<::std::convert::Infallible>>
                         + ::core::marker::Send
                 where
                     Self: ::core::clone::Clone + ::core::marker::Send + ::core::marker::Sync + 'static
