@@ -9,6 +9,7 @@ A custom Wayland bar written in Rust + GTK4.
 - Bluetooth
 - Dbusmenu ([Potentially useful resource](https://codeberg.org/janetski/statusnotifier-systray-gtk4/src/branch/main))
   - Use custom widgets to reduce usage of `Rc<Mutex<...>>`
+  - Test with: Discord, blueman, heroic, nm-applet
 - Audio (PipeWire)
 - Network (Netlink)
 - "`things.rs`"
@@ -16,11 +17,12 @@ A custom Wayland bar written in Rust + GTK4.
 ## TODO List (excluding refactors)
 
 - Full Bluetooth control (to replace `blueman-manager`)
-  - Investigate where connection notifications originate (likely KDE, but may be Blueman or something else)
-  - Don't forget to display battery levels somewhere
+  - Investigate where connection notifications originate (likely KDE, but may be Blueman or something else), and implement them.
+  - Don't forget to display battery levels somewhere (change icon color depending on battery level, and show precise level in tooltip)
+  - If possible, enable bluetooth when trying to connect device (is it possible to list unconnected devices when bluetooth is disabled ?) and disable bluetooth when last device is disconnected
 - Full network control (to replace `nm-applet`)
 - Bluetooth: deterministically sort items
-- Workspaces: show icons of contained windows ?
+- Workspaces: show icons of contained windows ? (i.e one small per window in the workspace)
 - Restructure `tryfol` as a workspace (use Varlink for IPC ?)
   - `tryfol-...`: crates for modules in `backend/*` that need to be shared between other crates
   - `tryfol-bar`: the bar itself
@@ -34,6 +36,8 @@ A custom Wayland bar written in Rust + GTK4.
   - `tryfol-idle-inhibitor`: small executable to manually inhibit idling, used to prevent swayidle from triggering after resuming from hibernation (run before sleep and terminate on resume, though it might not solve the issue)
 - Show USB devices battery if available (logitech mouse)
 - Use a consistent method of displaying errors (either all with `Display` or all with `Debug`)
+- Network: add ping with router and with internet
+- Network: if ping with the routeur exceed a thresold, disconnect and reconnect (in Daemon)
 
 ## Other known issues
 
