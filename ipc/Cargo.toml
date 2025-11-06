@@ -5,13 +5,13 @@ edition = "2024"
 
 [dependencies]
 ipc-macros.workspace = true
-# not used directly, but needed by ipc-macros
+
 anyhow.workspace = true
+futures.workspace = true
 log.workspace = true
+thiserror.workspace = true
 tokio = { workspace = true, features = ["io-util", "net", "sync", "rt"] }
 
-thiserror = "2"
-futures = "0.3"
-
 [dev-dependencies]
-tokio = { workspace = true, features = ["macros"] }
+async-stream.workspace = true
+tokio = { workspace = true, features = ["time", "macros", "rt-multi-thread"] }

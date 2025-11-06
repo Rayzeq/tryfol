@@ -1,4 +1,6 @@
-// allow usage of the macros of ipc-macros in this crate
+#![feature(never_type)]
+
+// allow usage of macros from ipc-macros in this crate
 extern crate self as ipc;
 
 pub use anyhow;
@@ -15,7 +17,7 @@ pub mod rw;
 
 pub use client::Connection;
 pub use errors::ClientError;
-use rw::{Read, Write};
+pub use rw::{Read, Write};
 
 pub type Result<T, E> = core::result::Result<T, ClientError<E>>;
 

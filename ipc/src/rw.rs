@@ -1,5 +1,7 @@
+//! Read / Write traits to send values over IPC
+
 use anyhow::Context;
-use std::{borrow::Cow, convert::Infallible, future::Future, io};
+use std::{borrow::Cow, future::Future, io};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -30,7 +32,7 @@ pub struct InvalidDiscriminantError {
 }
 
 impl Read for () {
-    type Error = Infallible;
+    type Error = !;
 
     async fn read(_stream: &mut (impl AsyncRead + Unpin + Send)) -> Result<Self, Self::Error>
     where
@@ -75,7 +77,7 @@ impl Read for String {
         let len = u64::read(stream)
             .await?
             .try_into()
-            .context("String is too long for this platform")?;
+            .context("length exceeds platform capacity")?;
 
         let mut buf = vec![0; len];
         stream.read_exact(&mut buf).await?;
@@ -103,6 +105,7 @@ impl<T> Read for Vec<T>
 where
     T: Read + Send,
     anyhow::Error: From<T::Error>,
+    Result<T, T::Error>: Context<T, T::Error>,
 {
     type Error = anyhow::Error;
 
@@ -110,14 +113,16 @@ where
     where
         Self: Sized,
     {
-        let len: usize = u64::read(stream)
-            .await?
-            .try_into()
-            .context("Too many elements for this platform")?;
+        let len: usize = usize::try_from(u64::read(stream).await?)
+            .context("length exceeds platform capacity")?;
 
         let mut result = Self::with_capacity(len);
-        for _ in 0..len {
-            result.push(T::read(stream).await?);
+        for i in 0..len {
+            result.push(
+                T::read(stream)
+                    .await
+                    .with_context(|| format!("while reading element {i}"))?,
+            );
         }
 
         Ok(result)
@@ -139,7 +144,7 @@ where
 }
 
 impl Write for () {
-    type Error = Infallible;
+    type Error = !;
 
     async fn write(
         &self,
@@ -174,6 +179,17 @@ simple_write_impl!(i16, write_i16);
 simple_write_impl!(i32, write_i32);
 simple_write_impl!(i64, write_i64);
 
+impl Write for str {
+    type Error = io::Error;
+
+    async fn write(
+        &self,
+        stream: &mut (impl AsyncWrite + Unpin + Send),
+    ) -> Result<(), Self::Error> {
+        (&self).write(stream).await
+    }
+}
+
 impl Write for &str {
     type Error = io::Error;
 
@@ -186,19 +202,8 @@ impl Write for &str {
     }
 }
 
-impl Write for str {
-    type Error = io::Error;
-
-    async fn write(
-        &self,
-        stream: &mut (impl AsyncWrite + Unpin + Send),
-    ) -> Result<(), Self::Error> {
-        (&self).write(stream).await
-    }
-}
-
 impl Write for String {
-    type Error = <&'static str as Write>::Error;
+    type Error = io::Error;
 
     async fn write(
         &self,
@@ -230,6 +235,7 @@ impl<T> Write for [T]
 where
     T: Write + Sync,
     anyhow::Error: From<T::Error>,
+    Result<(), T::Error>: Context<(), T::Error>,
 {
     type Error = anyhow::Error;
 
@@ -239,11 +245,29 @@ where
     ) -> Result<(), Self::Error> {
         (self.len() as u64).write(stream).await?;
 
-        for e in self {
-            e.write(stream).await?;
+        for (i, e) in self.iter().enumerate() {
+            e.write(stream)
+                .await
+                .with_context(|| format!("while writing element {i}"))?;
         }
 
         Ok(())
+    }
+}
+
+impl<T> Write for &[T]
+where
+    T: Write + Sync,
+    anyhow::Error: From<T::Error>,
+    Result<(), T::Error>: Context<(), T::Error>,
+{
+    type Error = anyhow::Error;
+
+    async fn write(
+        &self,
+        stream: &mut (impl AsyncWrite + Unpin + Send),
+    ) -> Result<(), Self::Error> {
+        (*self).write(stream).await
     }
 }
 
@@ -251,6 +275,7 @@ impl<T> Write for Vec<T>
 where
     T: Write + Sync,
     anyhow::Error: From<T::Error>,
+    Result<(), T::Error>: Context<(), T::Error>,
 {
     type Error = anyhow::Error;
 
@@ -276,17 +301,11 @@ ipc_macros::__impl_rw_for_external! {
         }
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ipc_macros::{Read, Write};
     use tokio::io::{BufReader, BufWriter};
-
-    #[derive(Read, Write)]
-    pub struct EmptyStruct {}
-
-    #[derive(Read, Write)]
-    pub enum EmptyEnum {}
 
     #[tokio::test]
     async fn test_read_unit() {
@@ -306,7 +325,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_read_u8() {
-        let data = &[42u8];
+        let data = &[42];
         let mut reader = BufReader::new(&data[..]);
         let result = u8::read(&mut reader).await.unwrap();
         assert_eq!(result, 42);
@@ -322,11 +341,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_read_i8() {
+        let data = &[255]; // -1 in two's complement
+        let mut reader = BufReader::new(&data[..]);
+        let result = i8::read(&mut reader).await.unwrap();
+        assert_eq!(result, -1);
+    }
+
+    #[tokio::test]
+    async fn test_write_i8() {
+        let mut writer = BufWriter::new(Vec::new());
+        (-1i8).write(&mut writer).await.unwrap();
+        writer.flush().await.unwrap();
+        let result = writer.into_inner();
+        assert_eq!(result, vec![255]);
+    }
+
+    #[tokio::test]
     async fn test_read_string() {
-        let data = &[0u8, 0, 0, 0, 0, 0, 0, 5, 72, 101, 108, 108, 111];
+        let data = &[0, 0, 0, 0, 0, 0, 0, 5, 72, 101, 108, 108, 111];
         let mut reader = BufReader::new(&data[..]);
         let result = String::read(&mut reader).await.unwrap();
         assert_eq!(result, "Hello");
+    }
+
+    #[tokio::test]
+    async fn test_write_str() {
+        let mut writer = BufWriter::new(Vec::new());
+        "Hello".write(&mut writer).await.unwrap();
+        writer.flush().await.unwrap();
+        let result = writer.into_inner();
+        assert_eq!(result, vec![0, 0, 0, 0, 0, 0, 0, 5, 72, 101, 108, 108, 111]);
     }
 
     #[tokio::test]
@@ -340,10 +385,28 @@ mod tests {
 
     #[tokio::test]
     async fn test_read_vec_u8() {
-        let data = &[0u8, 0, 0, 0, 0, 0, 0, 3, 1, 2, 3];
+        let data = &[0, 0, 0, 0, 0, 0, 0, 3, 1, 2, 3];
         let mut reader = BufReader::new(&data[..]);
         let result: Vec<u8> = Vec::read(&mut reader).await.unwrap();
         assert_eq!(result, vec![1, 2, 3]);
+    }
+
+    #[tokio::test]
+    async fn test_write_slice() {
+        let mut writer = BufWriter::new(Vec::new());
+        [1u8, 2, 3].write(&mut writer).await.unwrap();
+        writer.flush().await.unwrap();
+        let result = writer.into_inner();
+        assert_eq!(result, vec![0, 0, 0, 0, 0, 0, 0, 3, 1, 2, 3]);
+    }
+
+    #[tokio::test]
+    async fn test_write_ref_slice() {
+        let mut writer = BufWriter::new(Vec::new());
+        (&[1u8, 2, 3] as &[u8]).write(&mut writer).await.unwrap();
+        writer.flush().await.unwrap();
+        let result = writer.into_inner();
+        assert_eq!(result, vec![0, 0, 0, 0, 0, 0, 0, 3, 1, 2, 3]);
     }
 
     #[tokio::test]
@@ -357,7 +420,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_read_cow_str() {
-        let data = &[0u8, 0, 0, 0, 0, 0, 0, 5, 72, 101, 108, 108, 111];
+        let data = &[0, 0, 0, 0, 0, 0, 0, 5, 72, 101, 108, 108, 111];
         let mut reader = BufReader::new(&data[..]);
         let result: Cow<str> = Cow::read(&mut reader).await.unwrap();
         assert_eq!(result, "Hello");
@@ -381,5 +444,82 @@ mod tests {
         writer.flush().await.unwrap();
         let result = writer.into_inner();
         assert_eq!(result, vec![0, 0, 0, 0, 0, 0, 0, 5, 72, 101, 108, 108, 111]);
+    }
+
+    #[tokio::test]
+    async fn test_read_result_ok() {
+        let data = &[0, 0, 0, 0, 0, 0, 0, 0, 42]; // discriminant for Ok, then value
+        let mut reader = BufReader::new(&data[..]);
+        let result = <Result<u8, u8>>::read(&mut reader).await.unwrap();
+        assert_eq!(result, Ok(42));
+    }
+
+    #[tokio::test]
+    async fn test_read_result_err() {
+        let data = &[0, 0, 0, 0, 0, 0, 0, 1, 24]; // discriminant for Err, then value
+        let mut reader = BufReader::new(&data[..]);
+        let result = <Result<u8, u8>>::read(&mut reader).await.unwrap();
+        assert_eq!(result, Err(24));
+    }
+
+    #[tokio::test]
+    async fn test_write_result_ok() {
+        let mut writer = BufWriter::new(Vec::new());
+        let val: Result<u8, u8> = Ok(99);
+        val.write(&mut writer).await.unwrap();
+        writer.flush().await.unwrap();
+        let result = writer.into_inner();
+        // discriminant for Ok (0) followed by the value 99
+        assert_eq!(result, vec![0, 0, 0, 0, 0, 0, 0, 0, 99]);
+    }
+
+    #[tokio::test]
+    async fn test_write_result_err() {
+        let mut writer = BufWriter::new(Vec::new());
+        let val: Result<u8, u8> = Err(101);
+        val.write(&mut writer).await.unwrap();
+        writer.flush().await.unwrap();
+        let result = writer.into_inner();
+        // discriminant for Err (1) followed by the value 101
+        assert_eq!(result, vec![0, 0, 0, 0, 0, 0, 0, 1, 101]);
+    }
+
+    #[tokio::test]
+    async fn test_read_option_some() {
+        let data = &[0, 0, 0, 0, 0, 0, 0, 0, 42]; // discriminant for Some, then value
+        let mut reader = BufReader::new(&data[..]);
+        let result = <Option<u8>>::read(&mut reader).await.unwrap();
+        assert_eq!(result, Some(42));
+    }
+
+    #[tokio::test]
+    async fn test_read_option_none() {
+        let data = &[0, 0, 0, 0, 0, 0, 0, 1]; // discriminant for None
+        let mut reader = BufReader::new(&data[..]);
+        let result = <Option<u8>>::read(&mut reader).await.unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[tokio::test]
+    async fn test_write_option_some() {
+        let mut writer = BufWriter::new(Vec::new());
+        let val: Option<u8> = Some(99);
+        val.write(&mut writer).await.unwrap();
+        writer.flush().await.unwrap();
+        let result = writer.into_inner();
+        // discriminant for Some (0) followed by the value 99
+        assert_eq!(result, vec![0, 0, 0, 0, 0, 0, 0, 0, 99]);
+    }
+
+    #[tokio::test]
+    async fn test_write_option_none() {
+        let mut writer = BufWriter::new(Vec::new());
+        let val: Option<u8> = None;
+        val.write(&mut writer).await.unwrap();
+        writer.flush().await.unwrap();
+        let result = writer.into_inner();
+
+        // discriminant for None (1)
+        assert_eq!(result, vec![0, 0, 0, 0, 0, 0, 0, 1]);
     }
 }
