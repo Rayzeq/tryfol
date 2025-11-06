@@ -6,15 +6,14 @@ pkgs.mkShell {
     gtk4-layer-shell
     pipewire
     wireplumber
-    llvmPackages_17.llvm
-    llvmPackages_17.clang
-    llvmPackages_17.libclang
+    llvmPackages.llvm
+    llvmPackages.clang
+    llvmPackages.libclang
     udev
-    libdbusmenu
     openssl
   ];
   shellHook = ''
-    export LIBCLANG_PATH="${pkgs.llvmPackages_17.libclang.lib}/lib"
+    export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
     export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:${pkgs.wireplumber.dev}/lib/pkgconfig"
     echo "
       set auto-load safe-path /
