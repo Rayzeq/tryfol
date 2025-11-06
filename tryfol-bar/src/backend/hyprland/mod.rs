@@ -40,6 +40,8 @@ pub struct WorkspaceInfos {
     pub last_window: WindowAddress,
     #[serde(rename = "lastwindowtitle")]
     pub last_window_title: String,
+    #[serde(rename = "ispersistent")]
+    pub is_persistent: bool,
 }
 
 #[allow(dead_code, clippy::struct_excessive_bools)]
@@ -82,7 +84,7 @@ pub enum FullscreenMode {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct WindowAddress(pub u32);
+pub struct WindowAddress(pub u64);
 
 impl Workspace {
     pub const fn from(id: i32, name: String) -> Self {
@@ -131,7 +133,7 @@ impl WindowAddress {
             address = &address[2..];
         }
         Ok(Self(
-            u32::from_str_radix(address, 16).context("Invalid window address")?,
+            u64::from_str_radix(address, 16).context("Invalid window address")?,
         ))
     }
 }

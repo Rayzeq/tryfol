@@ -14,6 +14,7 @@ pub enum Event {
     },
     WorkspaceV2(Workspace),
     FocusedMonitor,
+    FocusedMonitorV2,
     ActiveWindow {
         class: String,
         title: String,
@@ -21,6 +22,7 @@ pub enum Event {
     ActiveWindowV2,
     Fullscreen,
     MonitorRemoved,
+    MonitorRemovedV2,
     MonitorAdded,
     MonitorAddedV2,
     CreateWorkspace,
@@ -31,6 +33,7 @@ pub enum Event {
     MoveWorkspaceV2,
     RenameWorkspace,
     ActiveSpecial,
+    ActiveSpecialV2,
     ActiveLayout,
     OpenWindow {
         address: WindowAddress,
@@ -57,6 +60,8 @@ pub enum Event {
     LockGroups,
     ConfigReloaded,
     Pin,
+    Minimized,
+    Bell,
 }
 
 impl Event {
@@ -71,6 +76,7 @@ impl Event {
                 Self::parse_full_workspace(arguments).context("While parsing `workspacev2`")?,
             ),
             "focusedmon" => Self::FocusedMonitor,
+            "focusedmonv2" => Self::FocusedMonitorV2,
             "activewindow" => {
                 let (class, title) = arguments
                     .split_once(',')
@@ -84,6 +90,7 @@ impl Event {
             "activewindowv2" => Self::ActiveWindowV2,
             "fullscreen" => Self::Fullscreen,
             "monitorremoved" => Self::MonitorRemoved,
+            "monitorremovedv2" => Self::MonitorRemovedV2,
             "monitoradded" => Self::MonitorAdded,
             "monitoraddedv2" => Self::MonitorAddedV2,
             "createworkspace" => Self::CreateWorkspace,
@@ -100,6 +107,7 @@ impl Event {
             "moveworkspacev2" => Self::MoveWorkspaceV2,
             "renameworkspace" => Self::RenameWorkspace,
             "activespecial" => Self::ActiveSpecial,
+            "activespecialv2" => Self::ActiveSpecialV2,
             "activelayout" => Self::ActiveLayout,
             "openwindow" => {
                 let values: [&str; 4] = arguments
@@ -136,6 +144,8 @@ impl Event {
             "lockgroups" => Self::LockGroups,
             "configreloaded" => Self::ConfigReloaded,
             "pin" => Self::Pin,
+            "minimized" => Self::Minimized,
+            "bell" => Self::Bell,
             name => anyhow::bail!("Unknown event: {name}"),
         })
     }
