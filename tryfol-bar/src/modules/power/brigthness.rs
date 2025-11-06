@@ -169,9 +169,8 @@ impl Device {
         F: Fn(Self) + 'static,
     {
         glib::spawn_future_local(async move {
-            if let Err(e) = Self::listen(f).await {
-                error!("Cannot listen backlight changes: {e}");
-            }
+            let Err(e) = Self::listen(f).await;
+            error!("Cannot listen backlight changes: {e}");
         })
     }
 

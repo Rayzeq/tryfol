@@ -49,7 +49,7 @@ impl Item {
         Ok(Self { proxy })
     }
 
-    pub fn destination(&self) -> &BusName {
+    pub fn destination(&self) -> &BusName<'_> {
         self.proxy.inner().destination()
     }
 

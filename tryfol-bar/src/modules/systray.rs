@@ -58,9 +58,8 @@ pub fn new() -> gtk::Box {
     };
 
     let task = glib::spawn_future_local(async move {
-        if let Err(e) = run_host(&mut tray).await {
-            error!("Error while running the status notifier host: {e}");
-        }
+        let Err(e) = run_host(&mut tray).await;
+        error!("Error while running the status notifier host: {e}");
     });
     // stop the task when the widget is dropped
     root.connect_destroy(move |_| {
@@ -166,9 +165,8 @@ impl Item {
             error!("Error setting up systray item {id}: {e}");
         }
         let task = glib::spawn_future_local(async move {
-            if let Err(e) = this.listen().await {
-                error!("Error while handling events: {e}");
-            }
+            let Err(e) = this.listen().await;
+            error!("Error while handling events: {e}");
         });
 
         Ok(ItemDisplay {

@@ -82,7 +82,7 @@ pub trait Device {
 
     #[zbus(property)]
     #[allow(non_snake_case)]
-    fn Adapter(&self) -> Result<ObjectPath, zbus::Error>;
+    fn Adapter(&self) -> Result<ObjectPath<'_>, zbus::Error>;
 
     #[zbus(property)]
     #[allow(non_snake_case)]

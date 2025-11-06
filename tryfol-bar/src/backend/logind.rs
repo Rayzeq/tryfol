@@ -40,7 +40,7 @@ pub trait Session {
     #[zbus(property(emits_changed_signal = "const"))]
     fn id(&self) -> zbus::Result<String>;
     #[zbus(property(emits_changed_signal = "const"))]
-    fn user(&self) -> zbus::Result<(u32, ObjectPath)>;
+    fn user(&self) -> zbus::Result<(u32, ObjectPath<'_>)>;
     #[zbus(property(emits_changed_signal = "const"))]
     fn name(&self) -> zbus::Result<String>;
     #[zbus(property(emits_changed_signal = "const"))]
@@ -50,7 +50,7 @@ pub trait Session {
     #[zbus(property(emits_changed_signal = "const"), name = "VTNr")]
     fn vt_number(&self) -> zbus::Result<u32>;
     #[zbus(property(emits_changed_signal = "const"))]
-    fn seat(&self) -> zbus::Result<(String, ObjectPath)>;
+    fn seat(&self) -> zbus::Result<(String, ObjectPath<'_>)>;
     #[zbus(property, name = "TTY")]
     fn tty(&self) -> zbus::Result<String>;
     #[zbus(property)]
