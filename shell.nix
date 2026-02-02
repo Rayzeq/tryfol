@@ -1,4 +1,4 @@
-{ pkgs ? import <nixos> { } }:
+{ pkgs ? import <nixpkgs> { } }:
 pkgs.mkShell {
   nativeBuildInputs = with pkgs.buildPackages; [
     pkg-config
@@ -11,6 +11,9 @@ pkgs.mkShell {
     llvmPackages.libclang
     udev
     openssl
+  ];
+  buildInputs = with pkgs; [
+    darkman
   ];
   shellHook = ''
     export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
