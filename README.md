@@ -38,6 +38,7 @@ A custom Wayland bar written in Rust + GTK4.
 - Use a consistent method of displaying errors (either all with `Display` or all with `Debug`)
 - Network: add ping with router and with internet
 - Network: if ping with the routeur exceed a thresold, disconnect and reconnect (in Daemon)
+- Cpu: make orange when 1 core is at 100%
 
 ## Other known issues
 
