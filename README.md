@@ -22,8 +22,8 @@ A custom Wayland bar written in Rust + GTK4.
   - If possible, enable bluetooth when trying to connect device (is it possible to list unconnected devices when bluetooth is disabled ?) and disable bluetooth when last device is disconnected
 - Full network control (to replace `nm-applet`)
 - Bluetooth: deterministically sort items
-- Workspaces: show icons of contained windows ? (i.e one small per window in the workspace)
-- Restructure `tryfol` as a workspace (use Varlink for IPC ?)
+- Workspaces: show icons of contained windows ? (i.e one small dot per window in the workspace)
+- Restructure `tryfol` as a workspace => custom ipc
   - `tryfol-...`: crates for modules in `backend/*` that need to be shared between other crates
   - `tryfol-bar`: the bar itself
   - `tryfol-daemon`
@@ -33,7 +33,6 @@ A custom Wayland bar written in Rust + GTK4.
     - Sound + notifications for plugging/unplugging the power cable
     - [Battery notifications](https://kota.nz/battery_notifications_with_udev.html)
     - Playerctl replacement (so the "current player" is consistent across keybinds and the bar)
-  - `tryfol-idle-inhibitor`: small executable to manually inhibit idling, used to prevent swayidle from triggering after resuming from hibernation (run before sleep and terminate on resume, though it might not solve the issue)
 - Show USB devices battery if available (logitech mouse)
 - Use a consistent method of displaying errors (either all with `Display` or all with `Debug`)
 - Network: add ping with router and with internet
