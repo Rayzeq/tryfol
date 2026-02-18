@@ -137,7 +137,7 @@ async fn run_manager(label: Label, connected_container: gtk::Box, container: gtk
                 let args = message.args().unwrap();
                 // I shouldn't have to clone here, I'm pretty sure it's a rust bug
                 // or is it because of tokio::select! ?
-                if let Some(device) = devices.remove(&args.object_path().to_owned().into()) {
+                if let Some(device) = devices.remove(&args.object_path().to_owned()) {
                     let parent: gtk::Box = device.parent().unwrap().downcast().unwrap();
                     parent.remove(&device);
 

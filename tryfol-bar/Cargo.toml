@@ -36,9 +36,7 @@ simple_logger = { version = "5.0.0", default-features = false, features = ["colo
 async-recursion = "1.1.1"
 serde_repr = "0.1.19"
 reqwest = "0.12.7"
-
-[dependencies.wl-nl80211]
-git = "https://github.com/ThisSeanZhang/wl-nl80211.git"
+wl-nl80211 = "0.4.0"
 
 [dependencies.wireplumber]
 git = "https://github.com/arcnmx/wireplumber.rs.git"

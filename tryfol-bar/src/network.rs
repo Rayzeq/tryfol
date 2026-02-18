@@ -325,19 +325,14 @@ async fn default_route(
 
     let Some(interface) = wifi_handle
         .interface()
-        .get()
+        .get(vec![Nl80211Attr::IfIndex(index)])
         .execute()
         .await
         .try_collect::<Vec<_>>()
         .await
         .unwrap()
-        .into_iter()
-        .find(|message| {
-            message
-                .payload
-                .attributes
-                .contains(&Nl80211Attr::IfIndex(index))
-        })
+        .first()
+        .cloned()
     else {
         return Some(route);
     };
