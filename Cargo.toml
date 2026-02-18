@@ -6,9 +6,12 @@ members = [ "ipc", "ipc-macros", "tryfol-bar"]
 ipc.path = "ipc"
 ipc-macros.path = "ipc-macros"
 
-anyhow = "1"
+anyhow = "1.0.101"
 async-stream = "0.3.6"
 futures = "0.3.31"
-log = "0.4"
+log = "0.4.29"
+proc-macro2 = "1.0.103"
+quote = "1.0.41"
+syn = "2.0.108"
 thiserror = "2.0.17"
-tokio = { version = "1" }
+tokio = "1.49.0"

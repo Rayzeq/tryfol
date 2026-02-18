@@ -7,11 +7,11 @@ edition = "2024"
 ipc-macros.workspace = true
 
 anyhow.workspace = true
+async-stream.workspace = true
 futures.workspace = true
 log.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["io-util", "net", "sync", "rt"] }
+tokio = { workspace = true, features = ["io-util", "net", "sync", "rt", "time", "macros"] }
 
 [dev-dependencies]
-async-stream.workspace = true
-tokio = { workspace = true, features = ["time", "macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["rt-multi-thread"] }

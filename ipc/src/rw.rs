@@ -1,6 +1,6 @@
 //! Read / Write traits to send values over IPC
 
-use anyhow::Context;
+use anyhow::{Context, bail};
 use std::{borrow::Cow, future::Future, io};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -42,6 +42,32 @@ impl Read for () {
     }
 }
 
+impl Read for ! {
+    type Error = !;
+
+    async fn read(_stream: &mut (impl AsyncRead + Unpin + Send)) -> Result<Self, Self::Error>
+    where
+        Self: Sized,
+    {
+        panic!("Cannot read a never value")
+    }
+}
+
+impl Read for bool {
+    type Error = anyhow::Error;
+
+    async fn read(stream: &mut (impl AsyncRead + Unpin + Send)) -> Result<Self, Self::Error>
+    where
+        Self: Sized,
+    {
+        Ok(match stream.read_u8().await? {
+            0 => false,
+            1 => true,
+            x => bail!("Invalid boolean value: {x}"),
+        })
+    }
+}
+
 macro_rules! simple_read_impl {
     ($type:ty, $method:ident) => {
         impl Read for $type {
@@ -66,6 +92,32 @@ simple_read_impl!(i8, read_i8);
 simple_read_impl!(i16, read_i16);
 simple_read_impl!(i32, read_i32);
 simple_read_impl!(i64, read_i64);
+
+macro_rules! tuple_read_impl {
+    ($t:ident $($ts:ident)*) => {
+        impl<$t, $($ts),*> Read for ($t, $($ts,)*)
+        where
+            $t: Read + Send,
+            $t::Error: Send,
+            $($ts: Read + Send,)*
+            $($ts::Error: Send,)*
+            anyhow::Error: From<$t::Error> $(+ From<$ts::Error>)*,
+        {
+            type Error = anyhow::Error;
+            async fn read(stream: &mut (impl AsyncRead + Unpin + Send)) -> Result<Self, Self::Error>
+            where
+                Self: Sized,
+            {
+                Ok(($t::read(stream).await?, $($ts::read(stream).await?,)*))
+            }
+        }
+
+        tuple_read_impl!($($ts)*);
+    };
+    () => {}
+}
+
+tuple_read_impl!(A B C D E F G H I J K L M N O P);
 
 impl Read for String {
     type Error = anyhow::Error;
@@ -154,6 +206,33 @@ impl Write for () {
     }
 }
 
+impl Write for ! {
+    type Error = !;
+
+    async fn write(
+        &self,
+        _stream: &mut (impl AsyncWrite + Unpin + Send),
+    ) -> Result<(), Self::Error> {
+        *self
+    }
+}
+
+impl Write for bool {
+    type Error = io::Error;
+
+    async fn write(
+        &self,
+        stream: &mut (impl AsyncWrite + Unpin + Send),
+    ) -> Result<(), Self::Error> {
+        stream
+            .write_u8(match self {
+                false => 0,
+                true => 1,
+            })
+            .await
+    }
+}
+
 macro_rules! simple_write_impl {
     ($type:ty, $method:ident) => {
         impl Write for $type {
@@ -178,6 +257,37 @@ simple_write_impl!(i8, write_i8);
 simple_write_impl!(i16, write_i16);
 simple_write_impl!(i32, write_i32);
 simple_write_impl!(i64, write_i64);
+
+macro_rules! tuple_write_impl {
+    ($t:ident $($ts:ident)*) => {
+        #[allow(non_snake_case)]
+        impl<$t, $($ts),*> Write for ($t, $($ts,)*)
+        where
+            $t: Write + Sync,
+            $($ts: Write + Sync,)*
+            anyhow::Error: From<$t::Error> $(+ From<$ts::Error>)*,
+        {
+            type Error = anyhow::Error;
+
+            async fn write(
+                &self,
+                stream: &mut (impl AsyncWrite + Unpin + Send),
+            ) -> Result<(), Self::Error> {
+                let (ref $t, $(ref $ts),*) = *self;
+
+                $t.write(stream).await?;
+                $($ts.write(stream).await?;)*
+
+                Ok(())
+            }
+        }
+
+        tuple_write_impl!($($ts)*);
+    };
+    () => {}
+}
+
+tuple_write_impl!(A B C D E F G H I J K L M N O P);
 
 impl Write for str {
     type Error = io::Error;

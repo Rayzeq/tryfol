@@ -3,60 +3,38 @@
 // allow usage of macros from ipc-macros in this crate
 extern crate self as ipc;
 
+use core::result::Result as StdResult;
+
+// re-exports for the macro
+#[doc(hidden)]
 pub use anyhow;
+#[doc(hidden)]
 pub use futures;
-pub use ipc_macros::{Read, Write, protocol};
+#[doc(hidden)]
 pub use log;
-use std::fmt::Debug;
+#[doc(hidden)]
 pub use tokio;
 
-mod client;
-mod errors;
-pub mod packet;
-pub mod rw;
+mod protocol;
+mod rw;
 
-pub use client::Connection;
-pub use errors::ClientError;
-pub use rw::{Read, Write};
+/// Derive macro for implementing [`Read`].
+#[doc(inline)]
+pub use ipc_macros::Read;
+/// Derive macro for implementing [`Write`].
+#[doc(inline)]
+pub use ipc_macros::Write;
+pub use ipc_macros::protocol;
+pub use protocol::Error;
+pub use rw::{InvalidDiscriminantError, Read, Write};
 
-pub type Result<T, E> = core::result::Result<T, ClientError<E>>;
+pub type Result<T> = StdResult<T, Error>;
 
-/// Type of a method call, it contains the arguments of the method
-pub trait Method: Send + Sync {
-    type Response: Response;
-}
-
-/// Type of a method call that returns a stream, it contains the arguments of the method
-pub trait LongMethod: Send + Sync {
-    type Response: Response;
-}
-
-/// Trait implemented by the enum containing all possible calls
-pub trait AnyCall: Send + Sync + Write<Error: Send + Sync + 'static> {
-    type Response: AnyResponse;
-}
-
-/// Type of the response of one precise method call
-pub trait Response {
-    type Inner;
-    fn into_inner(self) -> Self::Inner;
-}
-
-/// Trait implemented by the enum containing all possible reponses
-pub trait AnyResponse: Debug + Send + Sync + Read<Error: Send + Sync> + 'static {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[allow(unused)]
-    #[protocol]
-    pub trait ProtocolWithTwoIdenticalReturnType {
-        async fn func1(&self) -> ipc::Result<u32>;
-        async fn func2(&self) -> ipc::Result<u32>;
-    }
-
-    #[allow(unused)]
-    #[protocol(abstract_socket = "test")]
-    pub trait ProtocolWithAbstractSocketName {}
+#[doc(hidden)]
+pub mod __private {
+    pub use super::protocol::{
+        Clientbound, PacketReceiver, Serverbound, StreamPacket,
+        client::Client,
+        server::{run_server, stream_with_id},
+    };
 }
