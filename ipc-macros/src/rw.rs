@@ -1,9 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{
-    Data, DeriveInput, Fields, GenericParam, Generics, Ident, Index, Path, TypeParamBound,
-    WherePredicate, parse_quote, spanned::Spanned,
-};
+use syn::{Data, DeriveInput, Fields, GenericParam, Generics, Ident, Index, Path, TypeParamBound, WherePredicate, parse_quote, spanned::Spanned};
 
 pub fn derive_read(input: &DeriveInput) -> TokenStream {
     // Add a bound `T: Read` to every type parameter T.
@@ -70,19 +67,11 @@ pub fn derive_write(input: &DeriveInput) -> TokenStream {
     }
 }
 
-fn add_trait_bounds(
-    mut generics: Generics,
-    r#trait: &TokenStream,
-    generic_trait: &TypeParamBound,
-    is_read: bool,
-    is_enum: bool,
-) -> (Generics, Vec<WherePredicate>) {
+fn add_trait_bounds(mut generics: Generics, r#trait: &TokenStream, generic_trait: &TypeParamBound, is_read: bool, is_enum: bool) -> (Generics, Vec<WherePredicate>) {
     let mut where_predicates = Vec::with_capacity(generics.params.len());
     for param in &mut generics.params {
         if let GenericParam::Type(ref mut type_param) = *param {
-            type_param
-                .bounds
-                .push(TypeParamBound::Verbatim(r#trait.clone()));
+            type_param.bounds.push(TypeParamBound::Verbatim(r#trait.clone()));
             type_param.bounds.push(parse_quote!(::core::marker::Sync));
             if is_read {
                 type_param.bounds.push(parse_quote!(::core::marker::Send));
@@ -249,20 +238,13 @@ fn write_code_for_fields(fields: &Fields, has_self: bool) -> TokenStream {
 fn fields_to_pattern(fields: &Fields) -> TokenStream {
     match fields {
         Fields::Named(fields) => {
-            let recurse = fields
-                .named
-                .iter()
-                .map(|f| f.ident.as_ref().unwrap().clone());
+            let recurse = fields.named.iter().map(|f| f.ident.as_ref().unwrap().clone());
             quote! {
                 { #(#recurse,)* }
             }
         }
         Fields::Unnamed(fields) => {
-            let recurse = fields
-                .unnamed
-                .iter()
-                .enumerate()
-                .map(|(i, f)| Ident::new(&format!("f{i}"), f.span()));
+            let recurse = fields.unnamed.iter().enumerate().map(|(i, f)| Ident::new(&format!("f{i}"), f.span()));
             quote! {
                 (#(#recurse,)*)
             }

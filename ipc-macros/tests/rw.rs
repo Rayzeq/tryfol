@@ -202,14 +202,7 @@ async fn enum_mixed_variants() {
         Write { text: String, id: u8 },
     }
 
-    let inputs = vec![
-        Command::Quit,
-        Command::Move(10, -10),
-        Command::Write {
-            text: "Hello".to_string(),
-            id: 7,
-        },
-    ];
+    let inputs = vec![Command::Quit, Command::Move(10, -10), Command::Write { text: "Hello".to_string(), id: 7 }];
 
     for x in inputs {
         let mut writer = BufWriter::new(Vec::new());

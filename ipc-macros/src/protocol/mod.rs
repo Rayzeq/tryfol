@@ -1,7 +1,4 @@
-use syn::{
-    Attribute, Generics, Ident, Token, TraitItemFn, Type, TypeParamBound, Visibility,
-    punctuated::Punctuated,
-};
+use syn::{Attribute, Generics, Ident, Token, TraitItemFn, Type, TypeParamBound, Visibility, punctuated::Punctuated};
 
 mod generate;
 mod parse;
@@ -26,17 +23,11 @@ pub struct Protocol {
     methods: Vec<ProtocolMethod>,
 }
 
-#[expect(
-    clippy::large_enum_variant,
-    reason = "not a huge difference and enum won't have a lot of instances"
-)]
+#[expect(clippy::large_enum_variant, reason = "not a huge difference and enum won't have a lot of instances")]
 #[derive(Clone)]
 enum ProtocolMethod {
     SimpleCall(TraitItemFn),
-    LongCall {
-        method: TraitItemFn,
-        early_error: Option<Type>,
-    },
+    LongCall { method: TraitItemFn, early_error: Option<Type> },
 }
 
 impl ProtocolMethod {

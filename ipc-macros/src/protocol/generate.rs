@@ -40,23 +40,13 @@ impl Protocol {
     /// Emit errors for forbidden things and remove them from the code to avoid creating even more errors
     fn sanitize(&mut self) {
         if !self.generics.params.is_empty() {
-            Diagnostic::spanned(
-                self.generics.span().unwrap(),
-                Level::Error,
-                "protocols cannot have generics yet",
-            )
-            .emit();
+            Diagnostic::spanned(self.generics.span().unwrap(), Level::Error, "protocols cannot have generics yet").emit();
         }
 
         for method in &mut self.methods {
             let generics = &mut method.inner_mut().sig.generics;
             if !generics.params.is_empty() {
-                Diagnostic::spanned(
-                    generics.span().unwrap(),
-                    Level::Error,
-                    "protocol methods cannot contain generics or lifetimes",
-                )
-                .emit();
+                Diagnostic::spanned(generics.span().unwrap(), Level::Error, "protocol methods cannot contain generics or lifetimes").emit();
             }
             // delete generics to prevent a lot of irrelevant errors from showing up
             generics.params = Punctuated::new();
@@ -146,9 +136,7 @@ impl Protocol {
             .abstract_socket
             .as_ref()
             .map(|socket_name| self.generate_serve_method(socket_name))
-            .map_or((None, None), |(serve, handle_client)| {
-                (Some(serve), Some(handle_client))
-            });
+            .map_or((None, None), |(serve, handle_client)| (Some(serve), Some(handle_client)));
 
         quote! {
             #(#attributes)*
@@ -363,71 +351,74 @@ impl Protocol {
     }
 
     fn generate_client(&self) -> TokenStream {
-        let methods: Vec<_> = self.methods.iter().cloned().map(|mut method| {
-            let output = match &method.inner().sig.output {
-                ReturnType::Default => parse_quote!(()),
-                ReturnType::Type(_, output) => (*output).clone(),
-            };
+        let methods: Vec<_> = self
+            .methods
+            .iter()
+            .cloned()
+            .map(|mut method| {
+                let output = match &method.inner().sig.output {
+                    ReturnType::Default => parse_quote!(()),
+                    ReturnType::Type(_, output) => (*output).clone(),
+                };
 
-            match &mut method {
-                ProtocolMethod::SimpleCall(method) => {
-                    method.sig.output = parse_quote!(-> ::ipc::Result<#output>);
-                }
-                ProtocolMethod::LongCall{ method, early_error } => {
-                    if let Some(error) = early_error {
-                        method.sig.output = parse_quote!(-> ::ipc::Result<::core::result::Result<impl ::ipc::futures::Stream<Item = ::ipc::Result<#output>> + ::core::marker::Send, #error>>);
-                    } else {
-                        method.sig.output = parse_quote!(-> ::ipc::Result<impl ::ipc::futures::Stream<Item = ::ipc::Result<#output>> + ::core::marker::Send>);
+                match &mut method {
+                    ProtocolMethod::SimpleCall(method) => {
+                        method.sig.output = parse_quote!(-> ::ipc::Result<#output>);
                     }
-                },
-            }
-
-            let signature = &method.inner().sig;
-            let name = &signature.ident;
-            let struct_name = Ident::new(&format!("{name}Call"), Span::mixed_site());
-            let args = signature
-                .inputs
-                .iter()
-                .filter_map(|x| match x {
-                    FnArg::Receiver(_) => None,
-                    FnArg::Typed(x) => Some(&x.pat)
-            });
-
-            match &method {
-                ProtocolMethod::SimpleCall(_) => {
-                    quote! {
-                        #signature {
-                            ::ipc::__private::Client::call(
-                                &self.inner,
-                                MethodCall::#name(#struct_name { #(#args),* })
-                            ).await
+                    ProtocolMethod::LongCall { method, early_error } => {
+                        if let Some(error) = early_error {
+                            method.sig.output =
+                                parse_quote!(-> ::ipc::Result<::core::result::Result<impl ::ipc::futures::Stream<Item = ::ipc::Result<#output>> + ::core::marker::Send, #error>>);
+                        } else {
+                            method.sig.output = parse_quote!(-> ::ipc::Result<impl ::ipc::futures::Stream<Item = ::ipc::Result<#output>> + ::core::marker::Send>);
                         }
                     }
-                },
-                ProtocolMethod::LongCall{ early_error, .. } => {
-                    if early_error.is_some() {
+                }
+
+                let signature = &method.inner().sig;
+                let name = &signature.ident;
+                let struct_name = Ident::new(&format!("{name}Call"), Span::mixed_site());
+                let args = signature.inputs.iter().filter_map(|x| match x {
+                    FnArg::Receiver(_) => None,
+                    FnArg::Typed(x) => Some(&x.pat),
+                });
+
+                match &method {
+                    ProtocolMethod::SimpleCall(_) => {
                         quote! {
                             #signature {
-                                ::ipc::__private::Client::long_call(
+                                ::ipc::__private::Client::call(
                                     &self.inner,
                                     MethodCall::#name(#struct_name { #(#args),* })
                                 ).await
                             }
                         }
-                    } else {
-                        quote! {
-                            #signature {
-                                let ::core::result::Result::Ok(result) =::ipc::__private::Client::long_call::<_, _, !>(
-                                    &self.inner,
-                                    MethodCall::#name(#struct_name { #(#args),* })
-                                ).await?;
-                                Ok(result)
+                    }
+                    ProtocolMethod::LongCall { early_error, .. } => {
+                        if early_error.is_some() {
+                            quote! {
+                                #signature {
+                                    ::ipc::__private::Client::long_call(
+                                        &self.inner,
+                                        MethodCall::#name(#struct_name { #(#args),* })
+                                    ).await
+                                }
+                            }
+                        } else {
+                            quote! {
+                                #signature {
+                                    let ::core::result::Result::Ok(result) =::ipc::__private::Client::long_call::<_, _, !>(
+                                        &self.inner,
+                                        MethodCall::#name(#struct_name { #(#args),* })
+                                    ).await?;
+                                    Ok(result)
+                                }
                             }
                         }
                     }
                 }
-            }
-        }).collect();
+            })
+            .collect();
 
         let name = &self.client_name;
         let trait_name = &self.name;
