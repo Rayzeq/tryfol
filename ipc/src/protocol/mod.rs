@@ -12,6 +12,9 @@ use crate::{Read, Write};
 
 pub mod client;
 pub mod server;
+mod writable;
+
+pub use writable::Writable;
 
 #[derive(Debug, Error)]
 pub enum Error {

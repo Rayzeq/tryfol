@@ -1,7 +1,9 @@
+use std::iter;
+
 use proc_macro::{Diagnostic, Level};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{FnArg, Ident, ReturnType, parse_quote, punctuated::Punctuated, spanned::Spanned};
+use syn::{FnArg, GenericParam, Ident, Pat, PatIdent, ReturnType, WherePredicate, parse_quote, punctuated::Punctuated, spanned::Spanned};
 
 use super::{Protocol, ProtocolMethod};
 
@@ -55,36 +57,50 @@ impl Protocol {
     }
 
     fn generate_call_structs(&self) -> TokenStream {
-        let (variants, structs): (Vec<_>, Vec<_>) = self
+        let (variants, structs, generics): (Vec<_>, Vec<_>, Vec<_>) = self
             .methods
             .iter()
             .map(|method| {
                 let name = &method.inner().sig.ident;
                 let struct_name = Ident::new(&format!("{name}Call"), Span::mixed_site());
-                let fields = method.inner().sig.inputs.iter().filter_map(|arg| {
-                    let FnArg::Typed(arg) = arg else {
-                        return None;
-                    };
-                    let name = &arg.pat;
-                    let ty = &arg.ty;
-                    Some(quote!(pub #name: #ty))
-                });
+                let (fields, generics): (Vec<_>, Vec<_>) = method
+                    .inner()
+                    .sig
+                    .inputs
+                    .iter()
+                    .filter_map(|arg| {
+                        let FnArg::Typed(arg) = arg else {
+                            return None;
+                        };
+                        let name = match &*arg.pat {
+                            Pat::Ident(PatIdent { ident, .. }) => ident,
+                            x => {
+                                Diagnostic::spanned(x.span().unwrap(), Level::Error, "only simple identifiers are supported as arguments").emit();
+                                return None;
+                            }
+                        };
+                        let genric_name = Ident::new(&format!("{struct_name}_{name}"), Span::mixed_site());
+                        Some((quote!(pub #name: #genric_name), genric_name))
+                    })
+                    .collect();
 
                 (
-                    quote!(#name(#struct_name)),
+                    quote!(#name(#struct_name<#(#generics),*>)),
                     quote! {
                         #[derive(::ipc::Read, ::ipc::Write)]
-                        struct #struct_name {
+                        struct #struct_name<#(#generics),*> {
                             #(#fields),*
                         }
                     },
+                    generics,
                 )
             })
             .collect();
 
+        let generics = generics.iter().flatten();
         quote! {
             #[derive(::ipc::Read, ::ipc::Write)]
-            enum MethodCall {
+            enum MethodCall<#(#generics),*> {
                 #(#variants),*
             }
 
@@ -152,19 +168,19 @@ impl Protocol {
 
     fn generate_serve_method(&self, socket_name: &str) -> (TokenStream, TokenStream) {
         let server_name = &self.server_name;
-        let (variable_creation, read_branch, select_branch): (Vec<_>, Vec<_>, Vec<_>) = self.methods.iter().map(|method| {
+        let (variable_creation, read_branch, select_branch, call_types): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = self.methods.iter().map(|method| {
             let name = &method.inner().sig.ident;
             let calls_name = Ident::new(&format!("{name}_calls"), Span::mixed_site());
             let call_struct_name = Ident::new(&format!("{name}Call"), Span::mixed_site());
 
-            let args_name: Vec<_> = method
+            let (args_name, args_types): (Vec<_>, Vec<_>) = method
                 .inner()
                 .sig
                 .inputs
                 .iter()
                 .filter_map(|arg| {
                     if let FnArg::Typed(arg) = arg {
-                        Some(&arg.pat)
+                        Some((&arg.pat, &arg.ty))
                     } else {
                         None
                     }
@@ -188,7 +204,7 @@ impl Protocol {
                         }
                     };
 
-                    (variable_creation, read_branch, select_branch)
+                    (variable_creation, read_branch, select_branch, args_types)
                 },
                 ProtocolMethod::LongCall { early_error, .. } => {
                     let streams_name = Ident::new(&format!("{name}_streams"), Span::mixed_site());
@@ -220,10 +236,11 @@ impl Protocol {
                         }
                     };
 
-                    (variable_creation, read_branch, select_branches)
+                    (variable_creation, read_branch, select_branches, args_types)
                 }
             }
         }).collect();
+        let call_types = call_types.iter().flatten();
 
         let handle_client_method = quote! {
             async fn handle_client(
@@ -257,7 +274,7 @@ impl Protocol {
 
                 #(#variable_creation)*
 
-                let read_stream = ::ipc::__private::PacketReceiver::receive_stream::<::ipc::__private::Clientbound<MethodCall>>(rx);
+                let read_stream = ::ipc::__private::PacketReceiver::receive_stream::<::ipc::__private::Clientbound<MethodCall<#(#call_types),*>>>(rx);
                 ::ipc::tokio::pin!(read_stream);
 
                 loop {
@@ -333,6 +350,27 @@ impl Protocol {
                     method
                 },
             };
+            
+            let mut generics: Vec<GenericParam> = Vec::new();
+            let mut where_clauses: Vec<WherePredicate> = Vec::new();
+            for arg in &mut method.sig.inputs {
+                if let FnArg::Typed(arg) = arg {
+                    let name = &arg.pat;
+                    let ty = &arg.ty;
+                    generics.push(parse_quote!(#name: ::ipc::__private::Writable<#ty>));
+                    where_clauses.push(parse_quote!(#name: Sync + Send));
+                    where_clauses.push(parse_quote!(<#name as ::ipc::Write>::Error: Sync + Send + 'static));
+                    where_clauses.push(parse_quote!(::ipc::anyhow::Error: ::core::convert::From<<#name as ::ipc::Write>::Error>));
+
+                    arg.ty = parse_quote!(#name);
+                }
+            }
+            let sig_mut = &mut method.sig;
+            sig_mut.generics.params.extend(generics);
+            let mut where_clause = sig_mut.generics.where_clause.clone().unwrap_or_else(|| parse_quote!(where));
+            where_clause.predicates.extend(where_clauses);
+            sig_mut.generics.where_clause = Some(where_clause);
+
             method.sig.asyncness = None;
             method
         }).collect();
@@ -344,6 +382,7 @@ impl Protocol {
 
         quote! {
             #(#attributes)*
+            #[allow(clippy::multiple_bound_locations)]
             pub trait #name #generics: #supertraits {
                 #(#methods)*
             }
@@ -351,11 +390,17 @@ impl Protocol {
     }
 
     fn generate_client(&self) -> TokenStream {
+        let generics_count: Vec<_> = self
+            .methods
+            .iter()
+            .map(|method| method.inner().sig.inputs.iter().filter(|x| matches!(x, FnArg::Typed(_))).count())
+            .collect();
         let methods: Vec<_> = self
             .methods
             .iter()
             .cloned()
-            .map(|mut method| {
+            .enumerate()
+            .map(|(i, mut method)| {
                 let output = match &method.inner().sig.output {
                     ReturnType::Default => parse_quote!(()),
                     ReturnType::Type(_, output) => (*output).clone(),
@@ -375,21 +420,51 @@ impl Protocol {
                     }
                 }
 
+                let mut generics: Vec<GenericParam> = Vec::new();
+                let mut where_clauses: Vec<WherePredicate> = Vec::new();
+                for arg in &mut method.inner_mut().sig.inputs {
+                    if let FnArg::Typed(arg) = arg {
+                        let name = &arg.pat;
+                        let ty = &arg.ty;
+                        generics.push(parse_quote!(#name: ::ipc::__private::Writable<#ty>));
+                        where_clauses.push(parse_quote!(#name: Sync + Send));
+                        where_clauses.push(parse_quote!(<#name as ::ipc::Write>::Error: Sync + Send + 'static));
+                        where_clauses.push(parse_quote!(::ipc::anyhow::Error: ::core::convert::From<<#name as ::ipc::Write>::Error>));
+
+                        arg.ty = parse_quote!(#name);
+                    }
+                }
+                let sig_mut = &mut method.inner_mut().sig;
+                sig_mut.generics.params.extend(generics);
+                let mut where_clause = sig_mut.generics.where_clause.clone().unwrap_or_else(|| parse_quote!(where));
+                where_clause.predicates.extend(where_clauses);
+                sig_mut.generics.where_clause = Some(where_clause);
+
                 let signature = &method.inner().sig;
                 let name = &signature.ident;
                 let struct_name = Ident::new(&format!("{name}Call"), Span::mixed_site());
-                let args = signature.inputs.iter().filter_map(|x| match x {
-                    FnArg::Receiver(_) => None,
-                    FnArg::Typed(x) => Some(&x.pat),
-                });
+                let args: Vec<_> = signature
+                    .inputs
+                    .iter()
+                    .filter_map(|x| match x {
+                        FnArg::Receiver(_) => None,
+                        FnArg::Typed(x) => Some(&x.pat),
+                    })
+                    .collect();
 
+                let generics: Vec<_> = generics_count[..i]
+                    .iter()
+                    .flat_map(|count| iter::repeat_n(quote!(!), *count))
+                    .chain(args.iter().map(|ty| quote!(#ty)))
+                    .chain(generics_count[(i + 1)..].iter().flat_map(|count| iter::repeat_n(quote!(!), *count)))
+                    .collect();
                 match &method {
                     ProtocolMethod::SimpleCall(_) => {
                         quote! {
                             #signature {
-                                ::ipc::__private::Client::call(
+                                ::ipc::__private::Client::call::<MethodCall<#(#generics),*>, #output>(
                                     &self.inner,
-                                    MethodCall::#name(#struct_name { #(#args),* })
+                                    MethodCall::<#(#generics),*>::#name(#struct_name { #(#args),* })
                                 ).await
                             }
                         }
@@ -398,18 +473,18 @@ impl Protocol {
                         if early_error.is_some() {
                             quote! {
                                 #signature {
-                                    ::ipc::__private::Client::long_call(
+                                    ::ipc::__private::Client::long_call::<MethodCall<#(#generics),*>, #output, #early_error>(
                                         &self.inner,
-                                        MethodCall::#name(#struct_name { #(#args),* })
+                                        MethodCall::<#(#generics),*>::#name(#struct_name { #(#args),* })
                                     ).await
                                 }
                             }
                         } else {
                             quote! {
                                 #signature {
-                                    let ::core::result::Result::Ok(result) =::ipc::__private::Client::long_call::<_, _, !>(
+                                    let ::core::result::Result::Ok(result) =::ipc::__private::Client::long_call::<MethodCall<#(#generics),*>, #output, !>(
                                         &self.inner,
-                                        MethodCall::#name(#struct_name { #(#args),* })
+                                        MethodCall::<#(#generics),*>::#name(#struct_name { #(#args),* })
                                     ).await?;
                                     Ok(result)
                                 }
@@ -455,6 +530,7 @@ impl Protocol {
                 inner: ::ipc::__private::Client<RX, TX>,
             }
 
+            #[allow(clippy::multiple_bound_locations)]
             impl<
                 RX: ::ipc::tokio::io::AsyncRead + ::core::marker::Unpin + ::core::marker::Send,
                 TX: ::ipc::tokio::io::AsyncWrite + ::core::marker::Unpin + ::core::marker::Send + ::core::marker::Sync,
