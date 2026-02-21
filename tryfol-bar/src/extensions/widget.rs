@@ -225,7 +225,7 @@ where
     widget.set_has_tooltip(tooltip_text.is_some());
     if let Some(tooltip_text) = tooltip_text {
         // if there is already a tooltip, update it
-        if let Some(tooltip) = get_tooltip_for_widget(widget) {
+        if let Some(tooltip) = unsafe { get_tooltip_for_widget(widget) } {
             if is_markup {
                 tooltip.set_markup(Some(&tooltip_text));
             } else {
@@ -233,18 +233,21 @@ where
             }
         }
 
-        widget.set_data("__rayzeq_tooltip_text", tooltip_text);
-        widget.set_data("__rayzeq_tooltip_is_markup", is_markup);
+        unsafe {
+            widget.set_data("__rayzeq_tooltip_text", tooltip_text);
+            widget.set_data("__rayzeq_tooltip_is_markup", is_markup);
+        }
     }
 
     // add a tooltip handler if we don't have one yet
-    if widget
-        .data::<SignalHandlerId>("__rayzeq_tooltip_handler")
-        .is_none()
-    {
+    if unsafe { widget.data::<SignalHandlerId>("__rayzeq_tooltip_handler") }.is_none() {
         let handler_id = widget.connect_query_tooltip(|widget, _, _, _, tooltip| {
-            let text: &String = widget.data("__rayzeq_tooltip_text").unwrap().as_ref();
-            let is_markup: &bool = widget.data("__rayzeq_tooltip_is_markup").unwrap().as_ref();
+            let (text, is_markup): (&String, &bool) = unsafe {
+                (
+                    widget.data("__rayzeq_tooltip_text").unwrap().as_ref(),
+                    widget.data("__rayzeq_tooltip_is_markup").unwrap().as_ref(),
+                )
+            };
 
             if *is_markup {
                 tooltip.set_markup(Some(text));
@@ -252,12 +255,16 @@ where
                 tooltip.set_text(Some(text));
             }
 
-            tooltip.set_data("__rayzeq_tooltip_owner", Downgrade::downgrade(&widget));
-            widget.set_data("__rayzeq_tooltip_widget", Downgrade::downgrade(&tooltip));
+            unsafe {
+                tooltip.set_data("__rayzeq_tooltip_owner", Downgrade::downgrade(&widget));
+                widget.set_data("__rayzeq_tooltip_widget", Downgrade::downgrade(&tooltip));
+            }
 
             true
         });
-        widget.set_data("__rayzeq_tooltip_handler", handler_id);
+        unsafe {
+            widget.set_data("__rayzeq_tooltip_handler", handler_id);
+        }
     }
 }
 
@@ -266,16 +273,16 @@ unsafe fn get_tooltip_for_widget<W>(widget: &W) -> Option<Tooltip>
 where
     W: ObjectExt + IsA<Widget>,
 {
-    let tooltip = Upgrade::upgrade(
+    let tooltip = Upgrade::upgrade(unsafe {
         widget
             .data::<WeakRef<Tooltip>>("__rayzeq_tooltip_widget")?
-            .as_ref(),
-    )?;
+            .as_ref()
+    })?;
 
-    if let Some(owner) = get_tooltip_owner(&tooltip) {
-        if widget.upcast_ref() != &owner {
-            return None;
-        }
+    if let Some(owner) = unsafe { get_tooltip_owner(&tooltip) }
+        && widget.upcast_ref() != &owner
+    {
+        return None;
     }
 
     Some(tooltip)
@@ -285,9 +292,9 @@ where
 ///
 /// We save the owner of tooltips because they can be re-used by gtk for different widgets.
 unsafe fn get_tooltip_owner(tooltip: &Tooltip) -> Option<Widget> {
-    Upgrade::upgrade(
+    Upgrade::upgrade(unsafe {
         tooltip
             .data::<WeakRef<Widget>>("__rayzeq_tooltip_owner")?
-            .as_ref(),
-    )
+            .as_ref()
+    })
 }

@@ -116,18 +116,18 @@ async fn run_manager(label: Label, connected_container: gtk::Box, container: gtk
             message = added_events.next() => {
                 let message = message.unwrap();
                 let args = message.args().unwrap();
-                if let Some(device) = new_interface(&label, &connected_container, &container, &connection, args.object_path(), args.interfaces_and_properties()).await {
-                    if let Some(old) = devices.insert(args.object_path().to_owned().into(), device) {
-                        let parent: gtk::Box = old.parent().unwrap().downcast().unwrap();
-                        parent.remove(&old);
+                if let Some(device) = new_interface(&label, &connected_container, &container, &connection, args.object_path(), args.interfaces_and_properties()).await
+                    && let Some(old) = devices.insert(args.object_path().to_owned().into(), device)
+                {
+                    let parent: gtk::Box = old.parent().unwrap().downcast().unwrap();
+                    parent.remove(&old);
 
-                        if parent == connected_container {
-                            let old_count = CONNECTED_COUNT.fetch_sub(1, Ordering::SeqCst);
-                            if old_count == 1 {
-                                label.set_text("󰂯");
-                                label.remove_css_class("connected");
-                                connected_container.set_visible(false);
-                            }
+                    if parent == connected_container {
+                        let old_count = CONNECTED_COUNT.fetch_sub(1, Ordering::SeqCst);
+                        if old_count == 1 {
+                            label.set_text("󰂯");
+                            label.remove_css_class("connected");
+                            connected_container.set_visible(false);
                         }
                     }
                 }

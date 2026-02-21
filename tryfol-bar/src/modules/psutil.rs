@@ -271,10 +271,11 @@ impl TemperaturesModule {
                 }
                 Some(_) | None => false,
             };
-            if let Some(high) = cpu.high() {
-                if !critical_set && cpu.current().celsius() > high.celsius() {
-                    self.cpu.add_css_class("high");
-                }
+            if let Some(high) = cpu.high()
+                && !critical_set
+                && cpu.current().celsius() > high.celsius()
+            {
+                self.cpu.add_css_class("high");
             }
         } else {
             error!("CPU temperature not found");
@@ -293,10 +294,11 @@ impl TemperaturesModule {
                 }
                 Some(_) | None => false,
             };
-            if let Some(high) = disk.high() {
-                if !critical_set && disk.current().celsius() > high.celsius() {
-                    self.disk.add_css_class("high");
-                }
+            if let Some(high) = disk.high()
+                && !critical_set
+                && disk.current().celsius() > high.celsius()
+            {
+                self.disk.add_css_class("high");
             }
         } else {
             error!("Disk temperature not found");

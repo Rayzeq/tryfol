@@ -401,7 +401,7 @@ impl Item {
             // early return to avoid the RefCell guard being held across an await point
             return Ok(());
         }
-        item.context_menu(x, y).await.map_err(Into::into)
+        item.context_menu(x, y).await
     }
 }
 

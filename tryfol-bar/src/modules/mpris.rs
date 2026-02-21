@@ -145,10 +145,10 @@ impl Module {
                     #[strong]
                     this,
                     async move {
-                        if let Some(player) = &*this.current_player.lock().await {
-                            if let Err(e) = player.toggle().await {
-                                error!("Cannot play/pause Mpris player: {e:?}");
-                            }
+                        if let Some(player) = &*this.current_player.lock().await
+                            && let Err(e) = player.toggle().await
+                        {
+                            error!("Cannot play/pause Mpris player: {e:?}");
                         }
                     }
                 ));
@@ -162,10 +162,10 @@ impl Module {
                     #[strong]
                     this,
                     async move {
-                        if let Some(player) = &*this.current_player.lock().await {
-                            if let Err(e) = player.previous().await {
-                                error!("Cannot skip Mpris player backward: {e:?}");
-                            }
+                        if let Some(player) = &*this.current_player.lock().await
+                            && let Err(e) = player.previous().await
+                        {
+                            error!("Cannot skip Mpris player backward: {e:?}");
                         }
                     }
                 ));
@@ -179,10 +179,10 @@ impl Module {
                     #[strong]
                     this,
                     async move {
-                        if let Some(player) = &*this.current_player.lock().await {
-                            if let Err(e) = player.next().await {
-                                error!("Cannot skip Mpris player forward: {e:?}");
-                            }
+                        if let Some(player) = &*this.current_player.lock().await
+                            && let Err(e) = player.next().await
+                        {
+                            error!("Cannot skip Mpris player forward: {e:?}");
                         }
                     }
                 ));

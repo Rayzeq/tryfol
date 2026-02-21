@@ -75,19 +75,11 @@ fn try_update(
         Status::Discharging => {
             let icon = ["󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
                 [(capacity as f64 / 10.).round() as usize];
-            let seconds = if present_rate > 0 {
-                Some(3600 * remaining_capacity / present_rate)
-            } else {
-                None
-            };
+            let seconds = (3600 * remaining_capacity).checked_div(present_rate);
             (icon, "discharging", seconds)
         }
         Status::Charging => {
-            let seconds = if present_rate > 0 {
-                Some(3600 * (last_capacity - remaining_capacity) / present_rate)
-            } else {
-                None
-            };
+            let seconds = (3600 * (last_capacity - remaining_capacity)).checked_div(present_rate);
             ("󰂄", "charging", seconds)
         }
         Status::Full => ("", "full", None),

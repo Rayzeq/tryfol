@@ -173,7 +173,7 @@ async fn update(
                 Ok(x) => x
                     .iter()
                     .find(|(_, (r#type, _))| *r#type == rfkill::Type::Wlan)
-                    .map_or(true, |(_, (_, state))| *state),
+                    .is_none_or(|(_, (_, state))| *state),
                 Err(e) => {
                     error!("Cannot get rfkill state: {e}");
                     false

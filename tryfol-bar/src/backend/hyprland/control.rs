@@ -93,7 +93,9 @@ async fn raw_request_noretry(flags: &[char], command: &str) -> anyhow::Result<Ve
     socket
         .write_all(command.as_bytes())
         .context("Cannot write to Hyprland control socket")?;
-    socket.set_nonblocking(true);
+    socket
+        .set_nonblocking(true)
+        .context("Cannot put socket in non-blocking mode")?;
 
     let mut socket =
         UnixStream::from_std(socket).context("Cannot convert std socket to tokio socket")?;

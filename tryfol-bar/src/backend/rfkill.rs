@@ -49,7 +49,7 @@ enum Operation {
     Unknown,
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(Default)]
 struct RawEvent {
     index: u32,
@@ -101,15 +101,15 @@ impl Manager {
                     this.state
                         .insert(event.index, (event.r#type, event.hard || event.soft));
                     for (index, r#type, callback) in &this.callbacks {
-                        if let Some(index) = index {
-                            if *index != event.index {
-                                continue;
-                            }
+                        if let Some(index) = index
+                            && *index != event.index
+                        {
+                            continue;
                         }
-                        if let Some(r#type) = r#type {
-                            if *r#type != event.r#type {
-                                continue;
-                            }
+                        if let Some(r#type) = r#type
+                            && *r#type != event.r#type
+                        {
+                            continue;
                         }
                         callback(event.index, event.r#type, event.hard || event.soft);
                     }

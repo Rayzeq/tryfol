@@ -142,10 +142,9 @@ impl ModulesInner {
                 if AUTOKILL.contains(&title.as_str())
                 // other sublime text windows have no title unfortunatly
                 /*|| (class == "sublime_text" && title.is_empty())*/
+                && let Err(e) = hyprland::close_window(address).await
                 {
-                    if let Err(e) = hyprland::close_window(address).await {
-                        error!("Failed to close window: {e:?}");
-                    }
+                    error!("Failed to close window: {e:?}");
                 }
             }
             hyprland::Event::ActiveWindow { class, title } => {

@@ -140,13 +140,12 @@ impl Watcher {
             // self.is_status_notifier_host_registered_changed tries to lock the hosts, we must drop it here or we'll deadlock
             drop(hosts);
 
-            if hosts_count == 0 {
-                if let Err(e) = this
+            if hosts_count == 0
+                && let Err(e) = this
                     .is_status_notifier_host_registered_changed(&emitter)
                     .await
-                {
-                    error!("Error while sending is_status_notifier_host_registered signal: {e}");
-                }
+            {
+                error!("Error while sending is_status_notifier_host_registered signal: {e}");
             }
             if let Err(e) = Self::status_notifier_host_unregistered(&emitter).await {
                 error!("Error while sending status_notifier_host_unregistered signal: {e}");
