@@ -134,10 +134,6 @@ impl Protocol {
                     method
                 },
             };
-            if let Some(FnArg::Receiver(receiver)) = method.sig.inputs.first_mut() {
-                receiver.reference = None;
-                receiver.ty = parse_quote!(Self);
-            }
             method.sig.asyncness = None;
             method
         }).collect();
@@ -192,7 +188,6 @@ impl Protocol {
             };
             let read_branch = quote! {
                 ::core::result::Result::Ok(::ipc::__private::Clientbound { call_id, payload: MethodCall::#name(#call_struct_name { #(#args_name),* }) }) => ::ipc::futures::prelude::stream::FuturesUnordered::push(&mut #calls_name, {
-                    let server = server.clone();
                     async move { (call_id, #server_name::#name(server, #(#args_name),*).await) }
                 })
             };
@@ -243,8 +238,9 @@ impl Protocol {
         let call_types = call_types.iter().flatten();
 
         let handle_client_method = quote! {
+            #[allow(clippy::future_not_send, reason = "isn't needed for callers to be send")]
             async fn handle_client(
-                server: impl #server_name + ::core::clone::Clone,
+                server: &impl #server_name,
                 rx: ::ipc::__private::PacketReceiver<::ipc::tokio::net::unix::OwnedReadHalf>,
                 mut tx: ::ipc::tokio::io::BufWriter<::ipc::tokio::net::unix::OwnedWriteHalf>,
             ) {
@@ -299,16 +295,16 @@ impl Protocol {
         };
 
         let serve_method = quote! {
-            fn serve(self) -> impl ::core::future::Future<Output = ::std::io::Result<!>> + ::core::marker::Send
+            fn serve(&self) -> impl ::core::future::Future<Output = ::std::io::Result<!>> + ::core::marker::Send
             where
-                Self: ::core::clone::Clone + ::core::marker::Send + ::core::marker::Sync + 'static,
+                Self: ::core::marker::Sized + ::core::marker::Sync,
             {
                 self.serve_with_abstract_socket(#socket_name)
             }
 
-            fn serve_with_abstract_socket(self, socket: &str) -> impl ::core::future::Future<Output = ::std::io::Result<!>> + ::core::marker::Send
+            fn serve_with_abstract_socket(&self, socket: &str) -> impl ::core::future::Future<Output = ::std::io::Result<!>> + ::core::marker::Send
             where
-                Self: ::core::clone::Clone + ::core::marker::Send + ::core::marker::Sync + 'static,
+                Self: ::core::marker::Sized + ::core::marker::Sync,
             {
                 async move {
                     let addr = <::std::os::unix::net::SocketAddr as ::std::os::linux::net::SocketAddrExt>::from_abstract_name(socket)?;
