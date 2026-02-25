@@ -1,17 +1,27 @@
 [workspace]
 resolver = "3"
-members = [ "ipc", "ipc-macros", "tryfol-bar"]
+members = [ "ipc", "ipc-macros", "tryfol-bar", "tryfol-daemon", "tryfol-ipc", "tryfolctl"]
 
 [workspace.dependencies]
 ipc.path = "ipc"
 ipc-macros.path = "ipc-macros"
+tryfol-ipc.path = "tryfol-ipc"
 
 anyhow = "1.0.101"
 async-stream = "0.3.6"
+clap = "4.5.59"
 futures = "0.3.31"
+humantime = "2.3.0"
 log = "0.4.29"
 proc-macro2 = "1.0.103"
 quote = "1.0.41"
+strum = "0.27.2"
 syn = "2.0.108"
+terminal_size = "0.4.3"
 thiserror = "2.0.17"
 tokio = "1.49.0"
+tokio-util = "0.7.18"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.22"
+which = "8.0.0"
+zbus = { version = "5.13.2", default-features = false, features = ["tokio"] }

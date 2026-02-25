@@ -1,0 +1,13 @@
+[package]
+name = "tryfolctl"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tryfol-ipc.workspace = true
+
+clap = { workspace = true, features = ["derive"] }
+futures.workspace = true
+terminal_size.workspace = true
+tokio.workspace = true
+which.workspace = true
