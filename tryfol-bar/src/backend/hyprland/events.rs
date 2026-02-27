@@ -1,10 +1,12 @@
-use super::{WindowAddress, Workspace};
-use crate::Split;
+use std::io;
+
 use anyhow::{Context, anyhow};
 use async_stream::stream;
 use futures::Stream;
-use std::io;
 use tokio::net::UnixStream;
+
+use super::{WindowAddress, Workspace};
+use crate::Split;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]

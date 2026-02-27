@@ -1,10 +1,5 @@
-use crate::{
-    Clickable, HasTooltip, Scrollable,
-    backend::{
-        dbusmenu::DBusMenu,
-        status_notifier::{self, Category, Event, Orientation, Status, run_host},
-    },
-};
+use std::{cmp::Ordering, collections::HashMap, convert::Infallible, rc::Rc};
+
 use anyhow::Context;
 use futures::{StreamExt, lock::Mutex};
 use gtk4::{
@@ -14,7 +9,14 @@ use gtk4::{
     prelude::*,
 };
 use log::error;
-use std::{cmp::Ordering, collections::HashMap, convert::Infallible, rc::Rc};
+
+use crate::{
+    Clickable, HasTooltip, Scrollable,
+    backend::{
+        dbusmenu::DBusMenu,
+        status_notifier::{self, Category, Event, Orientation, Status, run_host},
+    },
+};
 
 struct Host {
     root: gtk::Box,

@@ -1,10 +1,10 @@
-use crate::HasTooltip;
+use std::borrow::Cow;
+
 use gtk4::{
     self as gtk, Button, EventControllerScroll, EventControllerScrollFlags, Label, Orientation,
     glib::{self, Propagation, clone},
     prelude::{BoxExt, ButtonExt, WidgetExt},
 };
-use std::borrow::Cow;
 use wireplumber::{
     core::ObjectFeatures,
     lib::glib::{
@@ -17,6 +17,8 @@ use wireplumber::{
     registry::{ConstraintType, ConstraintVerb, Interest, ObjectInterest, ObjectManager},
     spa::{SpaPod, libspa::utils::Id},
 };
+
+use crate::HasTooltip;
 
 pub fn new() -> gtk::Box {
     let input_label = Label::new(None);

@@ -1,7 +1,8 @@
 //! Read / Write traits to send values over IPC
 
-use anyhow::{Context, bail};
 use std::{borrow::Cow, future::Future, io};
+
+use anyhow::{Context, bail};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -414,8 +415,9 @@ ipc_macros::__impl_rw_for_external! {
 #[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tokio::io::{BufReader, BufWriter};
+
+    use super::*;
 
     #[tokio::test]
     async fn test_read_unit() {

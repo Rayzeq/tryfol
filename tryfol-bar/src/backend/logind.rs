@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::os::fd::RawFd;
+
 use zbus::{proxy, zvariant::ObjectPath};
 
 #[proxy(

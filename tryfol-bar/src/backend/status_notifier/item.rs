@@ -1,7 +1,11 @@
 #![allow(dead_code)]
 
-use super::proxy::{Category, ItemProxy, Orientation, Pixmap, Status};
-use crate::backend::dbusmenu::DBusMenu;
+use std::{
+    cmp::Ordering,
+    path::{Path, PathBuf},
+    pin::Pin,
+};
+
 use anyhow::bail;
 use futures::{Stream, StreamExt, stream::select_all};
 use gtk4::{
@@ -11,12 +15,10 @@ use gtk4::{
     glib::Bytes,
 };
 use log::error;
-use std::{
-    cmp::Ordering,
-    path::{Path, PathBuf},
-    pin::Pin,
-};
 use zbus::{Connection, fdo, names::BusName};
+
+use super::proxy::{Category, ItemProxy, Orientation, Pixmap, Status};
+use crate::backend::dbusmenu::DBusMenu;
 
 #[derive(Debug, Clone)]
 pub struct Item {

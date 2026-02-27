@@ -1,5 +1,3 @@
-use clap::{Parser, Subcommand};
-use futures::StreamExt;
 use std::{
     env,
     io::{self, ErrorKind, Stdout, Write, stdout},
@@ -7,6 +5,9 @@ use std::{
     pin::pin,
     process::{ChildStdin, Command as StdCommand, Stdio},
 };
+
+use clap::{Parser, Subcommand};
+use futures::StreamExt;
 use terminal_size::terminal_size_of;
 use tryfol_ipc::daemon_control::{
     DaemonControl, LogsError, ModuleStatus, StartError, StatusError, StopError,

@@ -1,4 +1,10 @@
-use crate::HasTooltip;
+use std::{
+    collections::HashMap,
+    hash::Hash,
+    process::Stdio,
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
 use futures::StreamExt;
 use gtk::{
     Button, EventControllerMotion, Label, Orientation, Revealer, RevealerTransitionType, gdk,
@@ -7,18 +13,14 @@ use gtk::{
 };
 use gtk4 as gtk;
 use lazy_static::lazy_static;
-use std::{
-    collections::HashMap,
-    hash::Hash,
-    process::Stdio,
-    sync::atomic::{AtomicUsize, Ordering},
-};
 use tokio::process::Command;
 use zbus::{
     Connection,
     fdo::{ObjectManagerProxy, PropertiesProxy},
     zvariant::ObjectPath,
 };
+
+use crate::HasTooltip;
 
 mod dbus;
 use dbus::DeviceProxy;

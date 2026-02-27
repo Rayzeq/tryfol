@@ -1,13 +1,11 @@
-use crate::{
-    Clickable, Hoverable,
-    backend::{
-        hyprland,
-        mpris::{LoopStatus, Mpris, PlaybackStatus, Player},
-    },
+use std::{
+    collections::HashMap,
+    rc::Rc,
+    time::{Duration, Instant},
 };
+
 use anyhow::{Context as _, bail};
 use async_recursion::async_recursion;
-use core::f64;
 use futures::FutureExt;
 use gtk::{
     Button, Label, Revealer, RevealerTransitionType,
@@ -24,12 +22,15 @@ use gtk4::{
 };
 use log::error;
 use reqwest::Url;
-use std::{
-    collections::HashMap,
-    rc::Rc,
-    time::{Duration, Instant},
-};
 use tokio::{sync::Mutex, time::sleep};
+
+use crate::{
+    Clickable, Hoverable,
+    backend::{
+        hyprland,
+        mpris::{LoopStatus, Mpris, PlaybackStatus, Player},
+    },
+};
 
 pub fn new() -> gtk::Box {
     Module::new()

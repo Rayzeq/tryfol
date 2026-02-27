@@ -1,12 +1,13 @@
 // gio's futures are not send, so ours can't be either
 #![allow(clippy::future_not_send)]
 
+use std::env;
+
 use gtk::{
     Align, Application, ApplicationWindow, CssProvider, Orientation, gdk::Display, glib, prelude::*,
 };
 use gtk4 as gtk;
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
-use std::env;
 use things::StopFuckingWithMyClockLayout;
 
 mod audio;
@@ -16,8 +17,8 @@ mod extensions;
 mod modules;
 mod network;
 mod things;
-pub use extensions::*;
 
+pub use extensions::*;
 use modules::*;
 
 fn left_modules() -> gtk::Box {

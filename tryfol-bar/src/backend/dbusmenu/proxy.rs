@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+
 use zbus::{proxy, zvariant::OwnedValue};
 
 /// A DBus interface to expose menus on DBus.

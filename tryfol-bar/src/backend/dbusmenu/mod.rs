@@ -1,3 +1,10 @@
+use std::{
+    collections::HashMap,
+    future::Future,
+    rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use futures::StreamExt;
 use gtk4::{
     self as gtk, Button, CheckButton, Image, Label, Orientation, Popover, PositionType, Separator,
@@ -7,12 +14,6 @@ use gtk4::{
     prelude::*,
 };
 use log::{error, warn};
-use std::{
-    collections::HashMap,
-    future::Future,
-    rc::Rc,
-    time::{SystemTime, UNIX_EPOCH},
-};
 use tokio::sync::Mutex;
 use zbus::{
     Connection,

@@ -1,15 +1,17 @@
-use super::{
-    Item, Watcher,
-    proxy::{StatusNotifierItemRegistered, StatusNotifierItemUnregistered},
-};
+use std::{collections::HashSet, convert::Infallible, process};
+
 use log::error;
 use ordered_stream::OrderedStreamExt;
-use std::{collections::HashSet, convert::Infallible, process};
 use zbus::{
     Connection,
     export::ordered_stream,
     fdo::{RequestNameFlags, RequestNameReply},
     names::WellKnownName,
+};
+
+use super::{
+    Item, Watcher,
+    proxy::{StatusNotifierItemRegistered, StatusNotifierItemUnregistered},
 };
 
 pub trait Host {

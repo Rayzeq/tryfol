@@ -1,7 +1,8 @@
+use std::{collections::HashMap, rc::Rc};
+
 use futures::lock::Mutex;
 use gtk4::glib::{self, clone};
 use log::{error, warn};
-use std::{collections::HashMap, rc::Rc};
 use tokio::{fs::File, io::AsyncReadExt};
 
 const RFKILL_PATH: &str = "/dev/rfkill";

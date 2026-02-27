@@ -1,15 +1,17 @@
-use super::raw::PlayerProxy;
-pub use super::raw::{LoopStatus, PlaybackStatus, Time};
+use std::{borrow::Cow, collections::HashMap, future::Future};
+
 use futures::StreamExt;
 use gtk4::glib;
 use log::{error, warn};
-use std::{borrow::Cow, collections::HashMap, future::Future};
 use zbus::{
     Connection,
     fdo::{DBusProxy, PropertiesChangedArgs, PropertiesProxy},
     names::{InterfaceName, OwnedBusName},
     zvariant::{self, Value},
 };
+
+use super::raw::PlayerProxy;
+pub use super::raw::{LoopStatus, PlaybackStatus, Time};
 
 #[derive(Debug, Clone)]
 pub struct Player {

@@ -1,11 +1,13 @@
-use super::{WindowAddress, WindowInfos, WorkspaceId, WorkspaceInfos};
-use anyhow::{Context, anyhow};
 use std::{
     io::{self, ErrorKind, Write},
     os::unix::net::UnixStream as StdUnixStream,
     time::Duration,
 };
+
+use anyhow::{Context, anyhow};
 use tokio::{io::AsyncReadExt, net::UnixStream, time::sleep};
+
+use super::{WindowAddress, WindowInfos, WorkspaceId, WorkspaceInfos};
 
 pub async fn active_workspace() -> anyhow::Result<WorkspaceInfos> {
     let response = raw_request(&['j'], "activeworkspace").await?;

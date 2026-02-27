@@ -1,9 +1,8 @@
 use gtk::{
     EventControllerMotion, EventControllerScroll, EventControllerScrollFlags, EventSequenceState,
     GestureClick, Tooltip, Widget, gdk,
-    glib::Propagation,
     glib::{
-        self, SignalHandlerId, WeakRef, clone,
+        self, Propagation, SignalHandlerId, WeakRef, clone,
         clone::{Downgrade, Upgrade},
         object::{Cast, IsA, ObjectExt},
     },

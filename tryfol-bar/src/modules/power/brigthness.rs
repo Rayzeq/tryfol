@@ -1,4 +1,5 @@
-use crate::{Scrollable, backend::logind::SessionProxy};
+use std::{convert::Infallible, io, os::fd::AsRawFd};
+
 use anyhow::Context;
 use gtk::{
     Label,
@@ -8,9 +9,10 @@ use gtk::{
 };
 use gtk4::{self as gtk, glib::JoinHandle};
 use log::{error, warn};
-use std::{convert::Infallible, io, os::fd::AsRawFd};
 use udev::{Enumerator, MonitorBuilder};
 use zbus::Connection;
+
+use crate::{Scrollable, backend::logind::SessionProxy};
 
 #[derive(Debug, Clone)]
 struct Device {

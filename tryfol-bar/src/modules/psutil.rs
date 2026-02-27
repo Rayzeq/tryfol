@@ -1,4 +1,5 @@
-use crate::{FormatFixed, HasTooltip, Hoverable};
+use std::time::Duration;
+
 use gtk::{Label, Orientation, Revealer, RevealerTransitionType, glib, prelude::*};
 use gtk4 as gtk;
 use log::error;
@@ -7,7 +8,8 @@ use psutil::{
     memory::{os::linux::VirtualMemoryExt, swap_memory, virtual_memory},
     sensors::temperatures,
 };
-use std::time::Duration;
+
+use crate::{FormatFixed, HasTooltip, Hoverable};
 
 #[derive(Debug)]
 pub struct Modules {

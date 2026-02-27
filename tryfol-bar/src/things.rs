@@ -1,10 +1,10 @@
 use std::cmp::max;
 
 use gtk::{
+    Allocation, Orientation, Widget,
     glib::{self, Object},
     prelude::*,
     subclass::prelude::*,
-    Allocation, Orientation, Widget,
 };
 use gtk4 as gtk;
 

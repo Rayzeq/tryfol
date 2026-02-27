@@ -1,7 +1,5 @@
-use crate::{
-    HasTooltip, Japanese,
-    backend::hyprland::{self, Workspace, WorkspaceId, WorkspaceInfos},
-};
+use std::collections::HashMap;
+
 use futures::{StreamExt, pin_mut};
 use gtk::{
     Button, Label,
@@ -13,7 +11,11 @@ use gtk4 as gtk;
 use lazy_static::lazy_static;
 use log::error;
 use regex::Regex;
-use std::collections::HashMap;
+
+use crate::{
+    HasTooltip, Japanese,
+    backend::hyprland::{self, Workspace, WorkspaceId, WorkspaceInfos},
+};
 
 const AUTOKILL: &[&str] = &["Update - Sublime Text", "Update - Sublime Merge"];
 lazy_static! {

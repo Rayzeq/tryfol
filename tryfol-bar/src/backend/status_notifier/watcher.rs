@@ -1,7 +1,7 @@
-use super::proxy::{ItemProxy, WatcherProxy};
+use std::{collections::HashSet, sync::Arc};
+
 use futures::StreamExt;
 use log::error;
-use std::{collections::HashSet, sync::Arc};
 use tokio::sync::Mutex;
 use zbus::{
     Connection,
@@ -12,6 +12,8 @@ use zbus::{
     object_server::SignalEmitter,
     zvariant::OwnedObjectPath,
 };
+
+use super::proxy::{ItemProxy, WatcherProxy};
 
 #[derive(Debug, Clone, Default)]
 #[allow(clippy::module_name_repetitions)]

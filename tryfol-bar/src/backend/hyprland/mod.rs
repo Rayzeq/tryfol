@@ -1,8 +1,9 @@
-use anyhow::Context;
 use core::fmt::{self, Display};
+use std::path::{Path, PathBuf};
+
+use anyhow::Context;
 use serde::{Deserialize, de::Error};
 use serde_repr::Deserialize_repr;
-use std::path::{Path, PathBuf};
 
 mod control;
 mod events;

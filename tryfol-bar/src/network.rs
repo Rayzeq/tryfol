@@ -1,4 +1,10 @@
-use crate::{FormatFixed, HasTooltip, backend::rfkill};
+use std::{
+    cell::Cell,
+    net::IpAddr,
+    rc::Rc,
+    time::{Duration, SystemTime},
+};
+
 use futures::TryStreamExt;
 use gtk::{
     EventControllerMotion, Label, Orientation, Revealer, RevealerTransitionType,
@@ -14,13 +20,9 @@ use netlink_packet_route::{
     route::RouteAttribute,
 };
 use rtnetlink::IpVersion;
-use std::{
-    cell::Cell,
-    net::IpAddr,
-    rc::Rc,
-    time::{Duration, SystemTime},
-};
 use wl_nl80211::{Nl80211Attr, Nl80211BssInfo, Nl80211Element};
+
+use crate::{FormatFixed, HasTooltip, backend::rfkill};
 
 #[derive(Debug)]
 struct Route {

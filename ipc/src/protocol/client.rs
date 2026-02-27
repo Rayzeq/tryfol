@@ -1,6 +1,3 @@
-use async_stream::try_stream;
-use futures::Stream;
-use log::{error, trace};
 use std::{
     collections::HashMap,
     fmt::{self, Debug},
@@ -13,6 +10,10 @@ use std::{
         atomic::{AtomicU64, Ordering},
     },
 };
+
+use async_stream::try_stream;
+use futures::Stream;
+use log::{error, trace};
 use tokio::{
     io::{AsyncRead, AsyncWrite, BufReader},
     net::{
@@ -23,9 +24,8 @@ use tokio::{
     sync::{RwLock, mpsc},
 };
 
-use crate::{Read, Result, Write};
-
 use super::{Clientbound, Error, PacketSender, StreamPacket};
+use crate::{Read, Result, Write};
 
 type Callback<RX> = Box<
     dyn for<'a> Fn(&'a mut BufReader<RX>) -> Pin<Box<dyn Future<Output = bool> + Send + 'a>>

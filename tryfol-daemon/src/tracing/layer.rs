@@ -1,5 +1,6 @@
-use humantime::format_rfc3339_seconds;
 use std::{fmt::Write, time::SystemTime};
+
+use humantime::format_rfc3339_seconds;
 use tracing::{
     Event, Level, Subscriber,
     field::{Field, Visit},

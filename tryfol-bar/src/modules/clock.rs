@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use chrono::{Local, Locale};
 use gtk::{
     Button, Calendar, Label, Popover,
@@ -6,7 +8,6 @@ use gtk::{
 };
 use gtk4 as gtk;
 use log::error;
-use std::time::Duration;
 
 pub fn new() -> Button {
     let label = Label::new(Some(&get_time()));

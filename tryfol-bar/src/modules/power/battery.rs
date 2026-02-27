@@ -1,7 +1,5 @@
-use crate::{
-    Hoverable,
-    backend::battery::{self, Status},
-};
+use std::{path::Path, time::Duration};
+
 use gtk::{
     Label, Orientation, Revealer, RevealerTransitionType,
     glib::{self, ControlFlow},
@@ -10,7 +8,11 @@ use gtk::{
 use gtk4 as gtk;
 use lazy_static::lazy_static;
 use log::error;
-use std::{path::Path, time::Duration};
+
+use crate::{
+    Hoverable,
+    backend::battery::{self, Status},
+};
 
 lazy_static! {
     static ref BATTERY_PATH: &'static Path = &Path::new("/sys/class/power_supply/BAT0");
