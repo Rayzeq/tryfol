@@ -4,131 +4,131 @@ use proc_macro::{Diagnostic, Level};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    FnArg, GenericParam, Ident, Pat, PatIdent, ReturnType, WherePredicate, parse_quote,
-    punctuated::Punctuated, spanned::Spanned,
+	FnArg, GenericParam, Ident, Pat, PatIdent, ReturnType, WherePredicate, parse_quote,
+	punctuated::Punctuated, spanned::Spanned,
 };
 
 use super::{Protocol, ProtocolMethod};
 
 impl Protocol {
-    pub fn generate(mut self) -> TokenStream {
-        self.sanitize();
-        let name = &self.name;
-        let module_name = &self.module_name;
-        let server_name = &self.server_name;
-        let client_name = &self.client_name;
-        let visibility = &self.visibility;
+	pub fn generate(mut self) -> TokenStream {
+		self.sanitize();
+		let name = &self.name;
+		let module_name = &self.module_name;
+		let server_name = &self.server_name;
+		let client_name = &self.client_name;
+		let visibility = &self.visibility;
 
-        let call_structs = self.generate_call_structs();
-        let server_trait = self.generate_server_trait();
-        let client_trait = self.generate_client_trait();
-        let client = self.generate_client();
+		let call_structs = self.generate_call_structs();
+		let server_trait = self.generate_server_trait();
+		let client_trait = self.generate_client_trait();
+		let client = self.generate_client();
 
-        quote! {
-            #[allow(non_snake_case, non_camel_case_types)]
-            #[doc(hidden)]
-            mod #module_name {
-                use super::*;
+		quote! {
+			#[allow(non_snake_case, non_camel_case_types)]
+			#[doc(hidden)]
+			mod #module_name {
+				use super::*;
 
-                #call_structs
-                #server_trait
-                #client_trait
-                #client
-            }
+				#call_structs
+				#server_trait
+				#client_trait
+				#client
+			}
 
-            #visibility use #module_name::#server_name;
-            #visibility use #module_name::#client_name;
-            #visibility use #module_name::#name;
-        }
-    }
+			#visibility use #module_name::#server_name;
+			#visibility use #module_name::#client_name;
+			#visibility use #module_name::#name;
+		}
+	}
 
-    /// Emit errors for forbidden things and remove them from the code to avoid creating even more errors
-    fn sanitize(&mut self) {
-        if !self.generics.params.is_empty() {
-            Diagnostic::spanned(
-                self.generics.span().unwrap(),
-                Level::Error,
-                "protocols cannot have generics yet",
-            )
-            .emit();
-        }
+	/// Emit errors for forbidden things and remove them from the code to avoid creating even more errors
+	fn sanitize(&mut self) {
+		if !self.generics.params.is_empty() {
+			Diagnostic::spanned(
+				self.generics.span().unwrap(),
+				Level::Error,
+				"protocols cannot have generics yet",
+			)
+			.emit();
+		}
 
-        for method in &mut self.methods {
-            let generics = &mut method.inner_mut().sig.generics;
-            if !generics.params.is_empty() {
-                Diagnostic::spanned(
-                    generics.span().unwrap(),
-                    Level::Error,
-                    "protocol methods cannot contain generics or lifetimes",
-                )
-                .emit();
-            }
-            // delete generics to prevent a lot of irrelevant errors from showing up
-            generics.params = Punctuated::new();
-            generics.where_clause = None;
-        }
-    }
+		for method in &mut self.methods {
+			let generics = &mut method.inner_mut().sig.generics;
+			if !generics.params.is_empty() {
+				Diagnostic::spanned(
+					generics.span().unwrap(),
+					Level::Error,
+					"protocol methods cannot contain generics or lifetimes",
+				)
+				.emit();
+			}
+			// delete generics to prevent a lot of irrelevant errors from showing up
+			generics.params = Punctuated::new();
+			generics.where_clause = None;
+		}
+	}
 
-    fn generate_call_structs(&self) -> TokenStream {
-        let (variants, structs, generics): (Vec<_>, Vec<_>, Vec<_>) = self
-            .methods
-            .iter()
-            .map(|method| {
-                let name = &method.inner().sig.ident;
-                let struct_name = Ident::new(&format!("{name}Call"), Span::mixed_site());
-                let (fields, generics): (Vec<_>, Vec<_>) = method
-                    .inner()
-                    .sig
-                    .inputs
-                    .iter()
-                    .filter_map(|arg| {
-                        let FnArg::Typed(arg) = arg else {
-                            return None;
-                        };
-                        let name = match &*arg.pat {
-                            Pat::Ident(PatIdent { ident, .. }) => ident,
-                            x => {
-                                Diagnostic::spanned(
-                                    x.span().unwrap(),
-                                    Level::Error,
-                                    "only simple identifiers are supported as arguments",
-                                )
-                                .emit();
-                                return None;
-                            }
-                        };
-                        let genric_name =
-                            Ident::new(&format!("{struct_name}_{name}"), Span::mixed_site());
-                        Some((quote!(pub #name: #genric_name), genric_name))
-                    })
-                    .collect();
+	fn generate_call_structs(&self) -> TokenStream {
+		let (variants, structs, generics): (Vec<_>, Vec<_>, Vec<_>) = self
+			.methods
+			.iter()
+			.map(|method| {
+				let name = &method.inner().sig.ident;
+				let struct_name = Ident::new(&format!("{name}Call"), Span::mixed_site());
+				let (fields, generics): (Vec<_>, Vec<_>) = method
+					.inner()
+					.sig
+					.inputs
+					.iter()
+					.filter_map(|arg| {
+						let FnArg::Typed(arg) = arg else {
+							return None;
+						};
+						let name = match &*arg.pat {
+							Pat::Ident(PatIdent { ident, .. }) => ident,
+							x => {
+								Diagnostic::spanned(
+									x.span().unwrap(),
+									Level::Error,
+									"only simple identifiers are supported as arguments",
+								)
+								.emit();
+								return None;
+							}
+						};
+						let genric_name =
+							Ident::new(&format!("{struct_name}_{name}"), Span::mixed_site());
+						Some((quote!(pub #name: #genric_name), genric_name))
+					})
+					.collect();
 
-                (
-                    quote!(#name(#struct_name<#(#generics),*>)),
-                    quote! {
-                        #[derive(::ipc::Read, ::ipc::Write)]
-                        struct #struct_name<#(#generics),*> {
-                            #(#fields),*
-                        }
-                    },
-                    generics,
-                )
-            })
-            .collect();
+				(
+					quote!(#name(#struct_name<#(#generics),*>)),
+					quote! {
+						#[derive(::ipc::Read, ::ipc::Write)]
+						struct #struct_name<#(#generics),*> {
+							#(#fields),*
+						}
+					},
+					generics,
+				)
+			})
+			.collect();
 
-        let generics = generics.iter().flatten();
-        quote! {
-            #[derive(::ipc::Read, ::ipc::Write)]
-            enum MethodCall<#(#generics),*> {
-                #(#variants),*
-            }
+		let generics = generics.iter().flatten();
+		quote! {
+			#[derive(::ipc::Read, ::ipc::Write)]
+			enum MethodCall<#(#generics),*> {
+				#(#variants),*
+			}
 
-            #(#structs)*
-        }
-    }
+			#(#structs)*
+		}
+	}
 
-    fn generate_server_trait(&self) -> TokenStream {
-        let methods: Vec<_> = self
+	fn generate_server_trait(&self) -> TokenStream {
+		let methods: Vec<_> = self
             .methods
             .iter()
             .cloned()
@@ -162,35 +162,35 @@ impl Protocol {
             })
             .collect();
 
-        let server_name = &self.server_name;
-        let attributes = &self.attributes;
-        let generics = &self.generics.params;
-        let where_clause = &self.generics.where_clause;
-        let supertraits = &self.supertraits;
+		let server_name = &self.server_name;
+		let attributes = &self.attributes;
+		let generics = &self.generics.params;
+		let where_clause = &self.generics.where_clause;
+		let supertraits = &self.supertraits;
 
-        let (serve_method, handle_client_method) = self
-            .abstract_socket
-            .as_ref()
-            .map(|socket_name| self.generate_serve_method(socket_name))
-            .map_or((None, None), |(serve, handle_client)| {
-                (Some(serve), Some(handle_client))
-            });
+		let (serve_method, handle_client_method) = self
+			.abstract_socket
+			.as_ref()
+			.map(|socket_name| self.generate_serve_method(socket_name))
+			.map_or((None, None), |(serve, handle_client)| {
+				(Some(serve), Some(handle_client))
+			});
 
-        quote! {
-            #(#attributes)*
-            pub trait #server_name<#generics>: #supertraits #where_clause {
-                #(#methods)*
+		quote! {
+			#(#attributes)*
+			pub trait #server_name<#generics>: #supertraits #where_clause {
+				#(#methods)*
 
-                #serve_method
-            }
+				#serve_method
+			}
 
-            #handle_client_method
-        }
-    }
+			#handle_client_method
+		}
+	}
 
-    fn generate_serve_method(&self, socket_name: &str) -> (TokenStream, TokenStream) {
-        let server_name = &self.server_name;
-        let (variable_creation, read_branch, select_branch, call_types): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = self
+	fn generate_serve_method(&self, socket_name: &str) -> (TokenStream, TokenStream) {
+		let server_name = &self.server_name;
+		let (variable_creation, read_branch, select_branch, call_types): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = self
             .methods
             .iter()
             .map(|method| {
@@ -253,93 +253,93 @@ impl Protocol {
                 }
             })
             .collect();
-        let call_types = call_types.iter().flatten();
+		let call_types = call_types.iter().flatten();
 
-        let handle_client_method = quote! {
-            #[allow(clippy::future_not_send, reason = "isn't needed for callers to be send")]
-            async fn handle_client(
-                server: &impl #server_name,
-                rx: ::ipc::__private::PacketReceiver<::ipc::tokio::net::unix::OwnedReadHalf>,
-                mut tx: ::ipc::tokio::io::BufWriter<::ipc::tokio::net::unix::OwnedWriteHalf>,
-            ) {
-                macro_rules! send_packet {
-                    ($tx:expr, $id:expr, $payload:expr) => {
-                        let packet = ::ipc::__private::Serverbound {
-                            call_id: $id,
-                            payload: $payload,
-                        };
+		let handle_client_method = quote! {
+			#[allow(clippy::future_not_send, reason = "isn't needed for callers to be send")]
+			async fn handle_client(
+				server: &impl #server_name,
+				rx: ::ipc::__private::PacketReceiver<::ipc::tokio::net::unix::OwnedReadHalf>,
+				mut tx: ::ipc::tokio::io::BufWriter<::ipc::tokio::net::unix::OwnedWriteHalf>,
+			) {
+				macro_rules! send_packet {
+					($tx:expr, $id:expr, $payload:expr) => {
+						let packet = ::ipc::__private::Serverbound {
+							call_id: $id,
+							payload: $payload,
+						};
 
-                        let result = ::ipc::Write::write(&packet, &mut tx).await;
-                        if let ::core::result::Result::Err(e) = result {
-                            if let ::core::option::Option::Some(e) =
-                                ::ipc::anyhow::Error::downcast_ref::<::std::io::Error>(&e)
-                                && ::std::io::Error::kind(&e) == ::std::io::ErrorKind::BrokenPipe
-                            {
-                                // client disconnected (may have crashed or cancelled all calls)
-                                return;
-                            }
-                            ::ipc::log::error!("Error while sending packet to client: {e}");
-                        } else {
-                            // we don't really care if we can't flush
-                            let _ = ::ipc::tokio::io::AsyncWriteExt::flush(&mut $tx).await;
-                        }
-                    };
-                }
+						let result = ::ipc::Write::write(&packet, &mut tx).await;
+						if let ::core::result::Result::Err(e) = result {
+							if let ::core::option::Option::Some(e) =
+								::ipc::anyhow::Error::downcast_ref::<::std::io::Error>(&e)
+								&& ::std::io::Error::kind(&e) == ::std::io::ErrorKind::BrokenPipe
+							{
+								// client disconnected (may have crashed or cancelled all calls)
+								return;
+							}
+							::ipc::log::error!("Error while sending packet to client: {e}");
+						} else {
+							// we don't really care if we can't flush
+							let _ = ::ipc::tokio::io::AsyncWriteExt::flush(&mut $tx).await;
+						}
+					};
+				}
 
-                #(#variable_creation)*
+				#(#variable_creation)*
 
-                let read_stream = ::ipc::__private::PacketReceiver::receive_stream::<::ipc::__private::Clientbound<MethodCall<#(#call_types),*>>>(rx);
-                ::ipc::tokio::pin!(read_stream);
+				let read_stream = ::ipc::__private::PacketReceiver::receive_stream::<::ipc::__private::Clientbound<MethodCall<#(#call_types),*>>>(rx);
+				::ipc::tokio::pin!(read_stream);
 
-                loop {
-                    ::ipc::tokio::select! {
-                        ::core::option::Option::Some(packet) = ::ipc::futures::StreamExt::next(&mut read_stream) => match packet {
-                            #(#read_branch,)*
-                            ::core::result::Result::Err(e) => {
-                                if let ::core::option::Option::Some(e) = ::ipc::anyhow::Error::downcast_ref::<::std::io::Error>(&e)
-                                    && ::std::io::Error::kind(e) == ::std::io::ErrorKind::UnexpectedEof
-                                {
-                                    // client quitted normally
-                                    break;
-                                }
-                                ::ipc::log::error!("Error receiving message from client: {e}");
-                                break;
-                            }
-                        },
-                        #(#select_branch,)*
-                    }
-                }
-            }
-        };
+				loop {
+					::ipc::tokio::select! {
+						::core::option::Option::Some(packet) = ::ipc::futures::StreamExt::next(&mut read_stream) => match packet {
+							#(#read_branch,)*
+							::core::result::Result::Err(e) => {
+								if let ::core::option::Option::Some(e) = ::ipc::anyhow::Error::downcast_ref::<::std::io::Error>(&e)
+									&& ::std::io::Error::kind(e) == ::std::io::ErrorKind::UnexpectedEof
+								{
+									// client quitted normally
+									break;
+								}
+								::ipc::log::error!("Error receiving message from client: {e}");
+								break;
+							}
+						},
+						#(#select_branch,)*
+					}
+				}
+			}
+		};
 
-        let serve_method = quote! {
-            fn serve(&self) -> impl ::core::future::Future<Output = ::std::io::Result<!>> + ::core::marker::Send
-            where
-                Self: ::core::marker::Sized + ::core::marker::Sync,
-            {
-                self.serve_with_abstract_socket(#socket_name)
-            }
+		let serve_method = quote! {
+			fn serve(&self) -> impl ::core::future::Future<Output = ::std::io::Result<!>> + ::core::marker::Send
+			where
+				Self: ::core::marker::Sized + ::core::marker::Sync,
+			{
+				self.serve_with_abstract_socket(#socket_name)
+			}
 
-            fn serve_with_abstract_socket(&self, socket: &str) -> impl ::core::future::Future<Output = ::std::io::Result<!>> + ::core::marker::Send
-            where
-                Self: ::core::marker::Sized + ::core::marker::Sync,
-            {
-                async move {
-                    let addr = <::std::os::unix::net::SocketAddr as ::std::os::linux::net::SocketAddrExt>::from_abstract_name(socket)?;
-                    let listener = ::std::os::unix::net::UnixListener::bind_addr(&addr)?;
-                    ::std::os::unix::net::UnixListener::set_nonblocking(&listener, true)?;
-                    let listener = ::ipc::tokio::net::UnixListener::from_std(listener)?;
+			fn serve_with_abstract_socket(&self, socket: &str) -> impl ::core::future::Future<Output = ::std::io::Result<!>> + ::core::marker::Send
+			where
+				Self: ::core::marker::Sized + ::core::marker::Sync,
+			{
+				async move {
+					let addr = <::std::os::unix::net::SocketAddr as ::std::os::linux::net::SocketAddrExt>::from_abstract_name(socket)?;
+					let listener = ::std::os::unix::net::UnixListener::bind_addr(&addr)?;
+					::std::os::unix::net::UnixListener::set_nonblocking(&listener, true)?;
+					let listener = ::ipc::tokio::net::UnixListener::from_std(listener)?;
 
-                    ::ipc::__private::run_server(self, listener, handle_client).await
-                }
-            }
-        };
+					::ipc::__private::run_server(self, listener, handle_client).await
+				}
+			}
+		};
 
-        (serve_method, handle_client_method)
-    }
+		(serve_method, handle_client_method)
+	}
 
-    fn generate_client_trait(&self) -> TokenStream {
-        let methods: Vec<_> = self
+	fn generate_client_trait(&self) -> TokenStream {
+		let methods: Vec<_> = self
             .methods
             .iter()
             .cloned()
@@ -394,35 +394,35 @@ impl Protocol {
             })
             .collect();
 
-        let name = &self.name;
-        let attributes = &self.attributes;
-        let generics = &self.generics;
-        let supertraits = &self.supertraits;
+		let name = &self.name;
+		let attributes = &self.attributes;
+		let generics = &self.generics;
+		let supertraits = &self.supertraits;
 
-        quote! {
-            #(#attributes)*
-            #[allow(clippy::multiple_bound_locations)]
-            pub trait #name #generics: #supertraits {
-                #(#methods)*
-            }
-        }
-    }
+		quote! {
+			#(#attributes)*
+			#[allow(clippy::multiple_bound_locations)]
+			pub trait #name #generics: #supertraits {
+				#(#methods)*
+			}
+		}
+	}
 
-    fn generate_client(&self) -> TokenStream {
-        let generics_count: Vec<_> = self
-            .methods
-            .iter()
-            .map(|method| {
-                method
-                    .inner()
-                    .sig
-                    .inputs
-                    .iter()
-                    .filter(|x| matches!(x, FnArg::Typed(_)))
-                    .count()
-            })
-            .collect();
-        let methods: Vec<_> = self
+	fn generate_client(&self) -> TokenStream {
+		let generics_count: Vec<_> = self
+			.methods
+			.iter()
+			.map(|method| {
+				method
+					.inner()
+					.sig
+					.inputs
+					.iter()
+					.filter(|x| matches!(x, FnArg::Typed(_)))
+					.count()
+			})
+			.collect();
+		let methods: Vec<_> = self
             .methods
             .iter()
             .cloned()
@@ -522,13 +522,13 @@ impl Protocol {
             })
             .collect();
 
-        let name = &self.client_name;
-        let trait_name = &self.name;
-        let attributes = &self.attributes;
-        let impl_generics = self.generics.params.iter();
-        let (_, ty_generics, where_clause) = self.generics.split_for_impl();
+		let name = &self.client_name;
+		let trait_name = &self.name;
+		let attributes = &self.attributes;
+		let impl_generics = self.generics.params.iter();
+		let (_, ty_generics, where_clause) = self.generics.split_for_impl();
 
-        let socket_impl = self.abstract_socket.as_ref().map(|socket| {
+		let socket_impl = self.abstract_socket.as_ref().map(|socket| {
             quote! {
                 impl #name<::ipc::tokio::net::unix::OwnedReadHalf, ::ipc::tokio::net::unix::OwnedWriteHalf> {
                     pub fn new() -> ::std::io::Result<Self> {
@@ -544,29 +544,29 @@ impl Protocol {
             }
         });
 
-        // TODO: simplify, use less dyn, RwLock, ...
-        //
-        // Idea: pass function pointers pointing to reading functions instead of Box<dyn>
-        quote! {
-            #(#attributes)*
-            pub struct #name<
-                RX: ::ipc::tokio::io::AsyncRead + ::core::marker::Unpin + ::core::marker::Send + 'static,
-                TX: ::ipc::tokio::io::AsyncWrite + ::core::marker::Unpin + ::core::marker::Send,
+		// TODO: simplify, use less dyn, RwLock, ...
+		//
+		// Idea: pass function pointers pointing to reading functions instead of Box<dyn>
+		quote! {
+			#(#attributes)*
+			pub struct #name<
+				RX: ::ipc::tokio::io::AsyncRead + ::core::marker::Unpin + ::core::marker::Send + 'static,
+				TX: ::ipc::tokio::io::AsyncWrite + ::core::marker::Unpin + ::core::marker::Send,
 
-            > {
-                inner: ::ipc::__private::Client<RX, TX>,
-            }
+			> {
+				inner: ::ipc::__private::Client<RX, TX>,
+			}
 
-            #[allow(clippy::multiple_bound_locations)]
-            impl<
-                RX: ::ipc::tokio::io::AsyncRead + ::core::marker::Unpin + ::core::marker::Send,
-                TX: ::ipc::tokio::io::AsyncWrite + ::core::marker::Unpin + ::core::marker::Send + ::core::marker::Sync,
-                #(#impl_generics,)*
-            > #trait_name #ty_generics for #name<RX, TX> #where_clause {
-                #(#methods)*
-            }
+			#[allow(clippy::multiple_bound_locations)]
+			impl<
+				RX: ::ipc::tokio::io::AsyncRead + ::core::marker::Unpin + ::core::marker::Send,
+				TX: ::ipc::tokio::io::AsyncWrite + ::core::marker::Unpin + ::core::marker::Send + ::core::marker::Sync,
+				#(#impl_generics,)*
+			> #trait_name #ty_generics for #name<RX, TX> #where_clause {
+				#(#methods)*
+			}
 
-            #socket_impl
-        }
-    }
+			#socket_impl
+		}
+	}
 }

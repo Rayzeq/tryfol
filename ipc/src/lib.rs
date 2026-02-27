@@ -32,9 +32,9 @@ pub type Result<T> = StdResult<T, Error>;
 
 #[doc(hidden)]
 pub mod __private {
-    pub use super::protocol::{
-        Clientbound, PacketReceiver, Serverbound, StreamPacket, Writable,
-        client::Client,
-        server::{run_server, stream_with_id},
-    };
+	pub use super::protocol::{
+		Clientbound, PacketReceiver, Serverbound, StreamPacket, Writable,
+		client::Client,
+		server::{run_server, stream_with_id},
+	};
 }
