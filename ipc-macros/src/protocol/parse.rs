@@ -2,7 +2,8 @@ use proc_macro::{Diagnostic, Level};
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use syn::{
-    Expr, ExprLit, ExprPath, Ident, ItemTrait, Lit, Meta, MetaNameValue, Path, Result, Token, TraitItem, Type,
+    Expr, ExprLit, ExprPath, Ident, ItemTrait, Lit, Meta, MetaNameValue, Path, Result, Token,
+    TraitItem, Type,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
@@ -20,10 +21,19 @@ impl Parse for Arguments {
 
         for pair in pairs {
             if pair.path.is_ident("abstract_socket") {
-                if let Expr::Lit(ExprLit { lit: Lit::Str(ref s), .. }) = pair.value {
+                if let Expr::Lit(ExprLit {
+                    lit: Lit::Str(ref s),
+                    ..
+                }) = pair.value
+                {
                     abstract_socket.0 = Some(s.value());
                 } else {
-                    Diagnostic::spanned(pair.value.span().unwrap(), Level::Error, "abstract_socket must be a string literal").emit();
+                    Diagnostic::spanned(
+                        pair.value.span().unwrap(),
+                        Level::Error,
+                        "abstract_socket must be a string literal",
+                    )
+                    .emit();
                 }
                 abstract_socket.1.push(pair);
             } else if pair.path.is_ident("client_name") {
@@ -32,7 +42,12 @@ impl Parse for Arguments {
                 {
                     client_name.0 = Some(ident.clone());
                 } else {
-                    Diagnostic::spanned(pair.value.span().unwrap(), Level::Error, "client_name must be an identifier").emit();
+                    Diagnostic::spanned(
+                        pair.value.span().unwrap(),
+                        Level::Error,
+                        "client_name must be an identifier",
+                    )
+                    .emit();
                 }
                 client_name.1.push(pair);
             } else if pair.path.is_ident("server_name") {
@@ -41,11 +56,21 @@ impl Parse for Arguments {
                 {
                     server_name.0 = Some(ident.clone());
                 } else {
-                    Diagnostic::spanned(pair.value.span().unwrap(), Level::Error, "server_name must be an identifier").emit();
+                    Diagnostic::spanned(
+                        pair.value.span().unwrap(),
+                        Level::Error,
+                        "server_name must be an identifier",
+                    )
+                    .emit();
                 }
                 server_name.1.push(pair);
             } else {
-                Diagnostic::spanned(pair.path.span().unwrap(), Level::Error, format!("unknown argument: {}", pair.path.to_token_stream())).emit();
+                Diagnostic::spanned(
+                    pair.path.span().unwrap(),
+                    Level::Error,
+                    format!("unknown argument: {}", pair.path.to_token_stream()),
+                )
+                .emit();
             }
         }
 
@@ -65,15 +90,29 @@ impl Protocol {
     pub fn parse(args: Arguments, input: ItemTrait) -> Self {
         let name = &input.ident;
         let module_name = Ident::new(&format!("__{name}_inner"), Span::mixed_site());
-        let client_name = args.client_name.unwrap_or_else(|| Ident::new(&(name.to_string() + "Client"), Span::mixed_site()));
-        let server_name = args.server_name.unwrap_or_else(|| Ident::new(&(name.to_string() + "Server"), Span::mixed_site()));
+        let client_name = args
+            .client_name
+            .unwrap_or_else(|| Ident::new(&(name.to_string() + "Client"), Span::mixed_site()));
+        let server_name = args
+            .server_name
+            .unwrap_or_else(|| Ident::new(&(name.to_string() + "Server"), Span::mixed_site()));
 
         if let Some(unsafety) = input.unsafety {
-            Diagnostic::spanned(unsafety.span().unwrap(), Level::Error, "protocol trait cannot be unsafe").emit();
+            Diagnostic::spanned(
+                unsafety.span().unwrap(),
+                Level::Error,
+                "protocol trait cannot be unsafe",
+            )
+            .emit();
         }
 
         if let Some(auto_token) = input.auto_token {
-            Diagnostic::spanned(auto_token.span().unwrap(), Level::Error, "protocol trait cannot an auto trait").emit();
+            Diagnostic::spanned(
+                auto_token.span().unwrap(),
+                Level::Error,
+                "protocol trait cannot an auto trait",
+            )
+            .emit();
         }
 
         Self {
@@ -86,7 +125,11 @@ impl Protocol {
             name: input.ident,
             generics: input.generics,
             supertraits: input.supertraits,
-            methods: input.items.into_iter().filter_map(ProtocolMethod::parse).collect(),
+            methods: input
+                .items
+                .into_iter()
+                .filter_map(ProtocolMethod::parse)
+                .collect(),
         }
     }
 }
@@ -96,7 +139,12 @@ impl ProtocolMethod {
         match input {
             TraitItem::Fn(mut item_fn) => {
                 if item_fn.sig.asyncness.is_none() {
-                    Diagnostic::spanned(item_fn.sig.span().unwrap(), Level::Error, "protocol method must be async").emit();
+                    Diagnostic::spanned(
+                        item_fn.sig.span().unwrap(),
+                        Level::Error,
+                        "protocol method must be async",
+                    )
+                    .emit();
                 }
 
                 let attribute = item_fn
@@ -111,7 +159,9 @@ impl ProtocolMethod {
                             early_error: None,
                         }
                     } else {
-                        let pairs = match attribute.parse_args_with(Punctuated::<MetaNameType, Token![,]>::parse_terminated) {
+                        let pairs = match attribute.parse_args_with(
+                            Punctuated::<MetaNameType, Token![,]>::parse_terminated,
+                        ) {
                             Ok(x) => x.into_iter().collect(),
                             Err(e) => {
                                 e.span().unwrap().error(e.to_string()).emit();
@@ -125,7 +175,12 @@ impl ProtocolMethod {
                                 early_error.0 = Some(pair.r#type.clone());
                                 early_error.1.push(pair);
                             } else {
-                                Diagnostic::spanned(pair.path.span().unwrap(), Level::Error, format!("unknown argument: {}", pair.path.to_token_stream())).emit();
+                                Diagnostic::spanned(
+                                    pair.path.span().unwrap(),
+                                    Level::Error,
+                                    format!("unknown argument: {}", pair.path.to_token_stream()),
+                                )
+                                .emit();
                             }
                         }
 
@@ -141,9 +196,13 @@ impl ProtocolMethod {
                 })
             }
             item => {
-                Diagnostic::spanned(item.span().unwrap(), Level::Error, "unsupported item in protocol")
-                    .note("consider moving this item to a new supertrait")
-                    .emit();
+                Diagnostic::spanned(
+                    item.span().unwrap(),
+                    Level::Error,
+                    "unsupported item in protocol",
+                )
+                .note("consider moving this item to a new supertrait")
+                .emit();
                 None
             }
         }
@@ -162,7 +221,11 @@ impl Parse for MetaNameType {
         let eq_token = input.parse()?;
         let r#type = input.parse()?;
 
-        Ok(Self { path, eq_token, r#type })
+        Ok(Self {
+            path,
+            eq_token,
+            r#type,
+        })
     }
 }
 
@@ -181,7 +244,9 @@ fn emit_duplicate_warnings<T: Spanned>(pairs: &mut Vec<T>, name: &'static str) {
         let mut diagnostic = Diagnostic::spanned(
             last_pair.span().unwrap(),
             Level::Warning,
-            format!("multiple declaration of `{name}`, the latest declaration will shadow previous ones"),
+            format!(
+                "multiple declaration of `{name}`, the latest declaration will shadow previous ones"
+            ),
         );
         for pair in pairs {
             diagnostic = diagnostic.span_note(pair.span().unwrap(), "previous declaration here");

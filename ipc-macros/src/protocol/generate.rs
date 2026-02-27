@@ -3,7 +3,10 @@ use std::iter;
 use proc_macro::{Diagnostic, Level};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{FnArg, GenericParam, Ident, Pat, PatIdent, ReturnType, WherePredicate, parse_quote, punctuated::Punctuated, spanned::Spanned};
+use syn::{
+    FnArg, GenericParam, Ident, Pat, PatIdent, ReturnType, WherePredicate, parse_quote,
+    punctuated::Punctuated, spanned::Spanned,
+};
 
 use super::{Protocol, ProtocolMethod};
 
@@ -42,13 +45,23 @@ impl Protocol {
     /// Emit errors for forbidden things and remove them from the code to avoid creating even more errors
     fn sanitize(&mut self) {
         if !self.generics.params.is_empty() {
-            Diagnostic::spanned(self.generics.span().unwrap(), Level::Error, "protocols cannot have generics yet").emit();
+            Diagnostic::spanned(
+                self.generics.span().unwrap(),
+                Level::Error,
+                "protocols cannot have generics yet",
+            )
+            .emit();
         }
 
         for method in &mut self.methods {
             let generics = &mut method.inner_mut().sig.generics;
             if !generics.params.is_empty() {
-                Diagnostic::spanned(generics.span().unwrap(), Level::Error, "protocol methods cannot contain generics or lifetimes").emit();
+                Diagnostic::spanned(
+                    generics.span().unwrap(),
+                    Level::Error,
+                    "protocol methods cannot contain generics or lifetimes",
+                )
+                .emit();
             }
             // delete generics to prevent a lot of irrelevant errors from showing up
             generics.params = Punctuated::new();
@@ -75,11 +88,17 @@ impl Protocol {
                         let name = match &*arg.pat {
                             Pat::Ident(PatIdent { ident, .. }) => ident,
                             x => {
-                                Diagnostic::spanned(x.span().unwrap(), Level::Error, "only simple identifiers are supported as arguments").emit();
+                                Diagnostic::spanned(
+                                    x.span().unwrap(),
+                                    Level::Error,
+                                    "only simple identifiers are supported as arguments",
+                                )
+                                .emit();
                                 return None;
                             }
                         };
-                        let genric_name = Ident::new(&format!("{struct_name}_{name}"), Span::mixed_site());
+                        let genric_name =
+                            Ident::new(&format!("{struct_name}_{name}"), Span::mixed_site());
                         Some((quote!(pub #name: #genric_name), genric_name))
                     })
                     .collect();
@@ -109,34 +128,39 @@ impl Protocol {
     }
 
     fn generate_server_trait(&self) -> TokenStream {
-        let methods: Vec<_> = self.methods.iter().cloned().map(|method| {
-            let mut method = match method {
-                ProtocolMethod::SimpleCall(mut method) => {
-                    let output = match &method.sig.output {
-                        ReturnType::Default => parse_quote!(()),
-                        ReturnType::Type(_, output) => (*output).clone(),
-                    };
+        let methods: Vec<_> = self
+            .methods
+            .iter()
+            .cloned()
+            .map(|method| {
+                let mut method = match method {
+                    ProtocolMethod::SimpleCall(mut method) => {
+                        let output = match &method.sig.output {
+                            ReturnType::Default => parse_quote!(()),
+                            ReturnType::Type(_, output) => (*output).clone(),
+                        };
 
-                    method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = #output> + ::core::marker::Send);
-                    method
-                }
-                ProtocolMethod::LongCall{ mut method, early_error } => {
-                    let output = match &method.sig.output {
-                        ReturnType::Default => parse_quote!(()),
-                        ReturnType::Type(_, output) => (*output).clone(),
-                    };
-
-                    if let Some(error) = early_error {
-                        method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = ::core::result::Result<impl ::ipc::futures::Stream<Item = #output> + ::core::marker::Send, #error>> + ::core::marker::Send);
-                    } else {
-                        method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = impl ::ipc::futures::Stream<Item = #output> + ::core::marker::Send> + ::core::marker::Send);
+                        method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = #output> + ::core::marker::Send);
+                        method
                     }
-                    method
-                },
-            };
-            method.sig.asyncness = None;
-            method
-        }).collect();
+                    ProtocolMethod::LongCall { mut method, early_error } => {
+                        let output = match &method.sig.output {
+                            ReturnType::Default => parse_quote!(()),
+                            ReturnType::Type(_, output) => (*output).clone(),
+                        };
+
+                        if let Some(error) = early_error {
+                            method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = ::core::result::Result<impl ::ipc::futures::Stream<Item = #output> + ::core::marker::Send, #error>> + ::core::marker::Send);
+                        } else {
+                            method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = impl ::ipc::futures::Stream<Item = #output> + ::core::marker::Send> + ::core::marker::Send);
+                        }
+                        method
+                    }
+                };
+                method.sig.asyncness = None;
+                method
+            })
+            .collect();
 
         let server_name = &self.server_name;
         let attributes = &self.attributes;
@@ -148,7 +172,9 @@ impl Protocol {
             .abstract_socket
             .as_ref()
             .map(|socket_name| self.generate_serve_method(socket_name))
-            .map_or((None, None), |(serve, handle_client)| (Some(serve), Some(handle_client)));
+            .map_or((None, None), |(serve, handle_client)| {
+                (Some(serve), Some(handle_client))
+            });
 
         quote! {
             #(#attributes)*
@@ -164,77 +190,69 @@ impl Protocol {
 
     fn generate_serve_method(&self, socket_name: &str) -> (TokenStream, TokenStream) {
         let server_name = &self.server_name;
-        let (variable_creation, read_branch, select_branch, call_types): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = self.methods.iter().map(|method| {
-            let name = &method.inner().sig.ident;
-            let calls_name = Ident::new(&format!("{name}_calls"), Span::mixed_site());
-            let call_struct_name = Ident::new(&format!("{name}Call"), Span::mixed_site());
+        let (variable_creation, read_branch, select_branch, call_types): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = self
+            .methods
+            .iter()
+            .map(|method| {
+                let name = &method.inner().sig.ident;
+                let calls_name = Ident::new(&format!("{name}_calls"), Span::mixed_site());
+                let call_struct_name = Ident::new(&format!("{name}Call"), Span::mixed_site());
 
-            let (args_name, args_types): (Vec<_>, Vec<_>) = method
-                .inner()
-                .sig
-                .inputs
-                .iter()
-                .filter_map(|arg| {
-                    if let FnArg::Typed(arg) = arg {
-                        Some((&arg.pat, &arg.ty))
-                    } else {
-                        None
+                let (args_name, args_types): (Vec<_>, Vec<_>) = method.inner().sig.inputs.iter().filter_map(|arg| if let FnArg::Typed(arg) = arg { Some((&arg.pat, &arg.ty)) } else { None }).collect();
+
+                let variable_creation = quote! {
+                    let mut #calls_name = ::ipc::futures::prelude::stream::FuturesUnordered::new();
+                };
+                let read_branch = quote! {
+                    ::core::result::Result::Ok(::ipc::__private::Clientbound { call_id, payload: MethodCall::#name(#call_struct_name { #(#args_name),* }) }) => ::ipc::futures::prelude::stream::FuturesUnordered::push(&mut #calls_name, {
+                        async move { (call_id, #server_name::#name(server, #(#args_name),*).await) }
+                    })
+                };
+                match method {
+                    ProtocolMethod::SimpleCall(_) => {
+                        let select_branch = quote! {
+                            ::core::option::Option::Some((id, result)) = ::ipc::futures::StreamExt::next(&mut #calls_name), if !::ipc::futures::prelude::stream::FuturesUnordered::is_empty(&#calls_name) => {
+                                send_packet!(tx, id, result);
+                            }
+                        };
+
+                        (variable_creation, read_branch, select_branch, args_types)
                     }
-                })
-                .collect();
-
-            let variable_creation = quote! {
-                let mut #calls_name = ::ipc::futures::prelude::stream::FuturesUnordered::new();
-            };
-            let read_branch = quote! {
-                ::core::result::Result::Ok(::ipc::__private::Clientbound { call_id, payload: MethodCall::#name(#call_struct_name { #(#args_name),* }) }) => ::ipc::futures::prelude::stream::FuturesUnordered::push(&mut #calls_name, {
-                    async move { (call_id, #server_name::#name(server, #(#args_name),*).await) }
-                })
-            };
-            match method {
-                ProtocolMethod::SimpleCall(_) => {
-                    let select_branch = quote! {
-                        ::core::option::Option::Some((id, result)) = ::ipc::futures::StreamExt::next(&mut #calls_name), if !::ipc::futures::prelude::stream::FuturesUnordered::is_empty(&#calls_name) => {
-                            send_packet!(tx, id, result);
-                        }
-                    };
-
-                    (variable_creation, read_branch, select_branch, args_types)
-                },
-                ProtocolMethod::LongCall { early_error, .. } => {
-                    let streams_name = Ident::new(&format!("{name}_streams"), Span::mixed_site());
-                    let select_branch = if early_error.is_some() {
-                        quote! {
-                            ::core::option::Option::Some((id, stream)) = ::ipc::futures::StreamExt::next(&mut #calls_name), if !::ipc::futures::prelude::stream::FuturesUnordered::is_empty(&#calls_name) => {
-                                match stream {
-                                    ::core::result::Result::Ok(x) => ::ipc::futures::prelude::stream::SelectAll::push(&mut #streams_name, ::std::boxed::Box::pin(::ipc::__private::stream_with_id(id, x))),
-                                    ::core::result::Result::Err(e) => { send_packet!(tx, id, ::ipc::__private::StreamPacket::<!, _>::Error(e)); }
+                    ProtocolMethod::LongCall { early_error, .. } => {
+                        let streams_name = Ident::new(&format!("{name}_streams"), Span::mixed_site());
+                        let select_branch = if early_error.is_some() {
+                            quote! {
+                                ::core::option::Option::Some((id, stream)) = ::ipc::futures::StreamExt::next(&mut #calls_name), if !::ipc::futures::prelude::stream::FuturesUnordered::is_empty(&#calls_name) => {
+                                    match stream {
+                                        ::core::result::Result::Ok(x) => ::ipc::futures::prelude::stream::SelectAll::push(&mut #streams_name, ::std::boxed::Box::pin(::ipc::__private::stream_with_id(id, x))),
+                                        ::core::result::Result::Err(e) => { send_packet!(tx, id, ::ipc::__private::StreamPacket::<!, _>::Error(e)); }
+                                    }
                                 }
                             }
-                        }
-                    } else {
-                        quote! {
-                            ::core::option::Option::Some((id, stream)) = ::ipc::futures::StreamExt::next(&mut #calls_name), if !::ipc::futures::prelude::stream::FuturesUnordered::is_empty(&#calls_name) => {
-                                ::ipc::futures::prelude::stream::SelectAll::push(&mut #streams_name, ::std::boxed::Box::pin(::ipc::__private::stream_with_id(id, stream)));
+                        } else {
+                            quote! {
+                                ::core::option::Option::Some((id, stream)) = ::ipc::futures::StreamExt::next(&mut #calls_name), if !::ipc::futures::prelude::stream::FuturesUnordered::is_empty(&#calls_name) => {
+                                    ::ipc::futures::prelude::stream::SelectAll::push(&mut #streams_name, ::std::boxed::Box::pin(::ipc::__private::stream_with_id(id, stream)));
+                                }
                             }
-                        }
-                    };
+                        };
 
-                    let variable_creation = quote! {
-                        #variable_creation
-                        let mut #streams_name = ::ipc::futures::prelude::stream::SelectAll::new();
-                    };
-                    let select_branches = quote! {
-                        #select_branch,
-                        ::core::option::Option::Some((id, result)) = ::ipc::futures::StreamExt::next(&mut #streams_name), if !::ipc::futures::prelude::stream::SelectAll::is_empty(&#streams_name) => {
-                            send_packet!(tx, id, result);
-                        }
-                    };
+                        let variable_creation = quote! {
+                            #variable_creation
+                            let mut #streams_name = ::ipc::futures::prelude::stream::SelectAll::new();
+                        };
+                        let select_branches = quote! {
+                            #select_branch,
+                            ::core::option::Option::Some((id, result)) = ::ipc::futures::StreamExt::next(&mut #streams_name), if !::ipc::futures::prelude::stream::SelectAll::is_empty(&#streams_name) => {
+                                send_packet!(tx, id, result);
+                            }
+                        };
 
-                    (variable_creation, read_branch, select_branches, args_types)
+                        (variable_creation, read_branch, select_branches, args_types)
+                    }
                 }
-            }
-        }).collect();
+            })
+            .collect();
         let call_types = call_types.iter().flatten();
 
         let handle_client_method = quote! {
@@ -321,55 +339,60 @@ impl Protocol {
     }
 
     fn generate_client_trait(&self) -> TokenStream {
-        let methods: Vec<_> = self.methods.iter().cloned().map(|method| {
-            let mut method = match method {
-                ProtocolMethod::SimpleCall(mut method) => {
-                    let output = match &method.sig.output {
-                        ReturnType::Default => parse_quote!(()),
-                        ReturnType::Type(_, output) => (*output).clone(),
-                    };
+        let methods: Vec<_> = self
+            .methods
+            .iter()
+            .cloned()
+            .map(|method| {
+                let mut method = match method {
+                    ProtocolMethod::SimpleCall(mut method) => {
+                        let output = match &method.sig.output {
+                            ReturnType::Default => parse_quote!(()),
+                            ReturnType::Type(_, output) => (*output).clone(),
+                        };
 
-                    method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = ::ipc::Result<#output>> + ::core::marker::Send);
-                    method
-                }
-                ProtocolMethod::LongCall{mut method, early_error} => {
-                    let output = match &method.sig.output {
-                        ReturnType::Default => parse_quote!(()),
-                        ReturnType::Type(_, output) => (*output).clone(),
-                    };
-
-                    if let Some(error) = early_error {
-                        method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = ::ipc::Result<::core::result::Result<impl ::ipc::futures::Stream<Item = ::ipc::Result<#output>> + ::core::marker::Send, #error>>> + ::core::marker::Send);
-                    } else {
-                        method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = ::ipc::Result<impl ::ipc::futures::Stream<Item = ::ipc::Result<#output>> + ::core::marker::Send>> + ::core::marker::Send);
+                        method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = ::ipc::Result<#output>> + ::core::marker::Send);
+                        method
                     }
-                    method
-                },
-            };
-            
-            let mut generics: Vec<GenericParam> = Vec::new();
-            let mut where_clauses: Vec<WherePredicate> = Vec::new();
-            for arg in &mut method.sig.inputs {
-                if let FnArg::Typed(arg) = arg {
-                    let name = &arg.pat;
-                    let ty = &arg.ty;
-                    generics.push(parse_quote!(#name: ::ipc::__private::Writable<#ty>));
-                    where_clauses.push(parse_quote!(#name: Sync + Send));
-                    where_clauses.push(parse_quote!(<#name as ::ipc::Write>::Error: Sync + Send + 'static));
-                    where_clauses.push(parse_quote!(::ipc::anyhow::Error: ::core::convert::From<<#name as ::ipc::Write>::Error>));
+                    ProtocolMethod::LongCall { mut method, early_error } => {
+                        let output = match &method.sig.output {
+                            ReturnType::Default => parse_quote!(()),
+                            ReturnType::Type(_, output) => (*output).clone(),
+                        };
 
-                    arg.ty = parse_quote!(#name);
+                        if let Some(error) = early_error {
+                            method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = ::ipc::Result<::core::result::Result<impl ::ipc::futures::Stream<Item = ::ipc::Result<#output>> + ::core::marker::Send, #error>>> + ::core::marker::Send);
+                        } else {
+                            method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = ::ipc::Result<impl ::ipc::futures::Stream<Item = ::ipc::Result<#output>> + ::core::marker::Send>> + ::core::marker::Send);
+                        }
+                        method
+                    }
+                };
+
+                let mut generics: Vec<GenericParam> = Vec::new();
+                let mut where_clauses: Vec<WherePredicate> = Vec::new();
+                for arg in &mut method.sig.inputs {
+                    if let FnArg::Typed(arg) = arg {
+                        let name = &arg.pat;
+                        let ty = &arg.ty;
+                        generics.push(parse_quote!(#name: ::ipc::__private::Writable<#ty>));
+                        where_clauses.push(parse_quote!(#name: Sync + Send));
+                        where_clauses.push(parse_quote!(<#name as ::ipc::Write>::Error: Sync + Send + 'static));
+                        where_clauses.push(parse_quote!(::ipc::anyhow::Error: ::core::convert::From<<#name as ::ipc::Write>::Error>));
+
+                        arg.ty = parse_quote!(#name);
+                    }
                 }
-            }
-            let sig_mut = &mut method.sig;
-            sig_mut.generics.params.extend(generics);
-            let mut where_clause = sig_mut.generics.where_clause.clone().unwrap_or_else(|| parse_quote!(where));
-            where_clause.predicates.extend(where_clauses);
-            sig_mut.generics.where_clause = Some(where_clause);
+                let sig_mut = &mut method.sig;
+                sig_mut.generics.params.extend(generics);
+                let mut where_clause = sig_mut.generics.where_clause.clone().unwrap_or_else(|| parse_quote!(where));
+                where_clause.predicates.extend(where_clauses);
+                sig_mut.generics.where_clause = Some(where_clause);
 
-            method.sig.asyncness = None;
-            method
-        }).collect();
+                method.sig.asyncness = None;
+                method
+            })
+            .collect();
 
         let name = &self.name;
         let attributes = &self.attributes;
@@ -389,7 +412,15 @@ impl Protocol {
         let generics_count: Vec<_> = self
             .methods
             .iter()
-            .map(|method| method.inner().sig.inputs.iter().filter(|x| matches!(x, FnArg::Typed(_))).count())
+            .map(|method| {
+                method
+                    .inner()
+                    .sig
+                    .inputs
+                    .iter()
+                    .filter(|x| matches!(x, FnArg::Typed(_)))
+                    .count()
+            })
             .collect();
         let methods: Vec<_> = self
             .methods
