@@ -34,10 +34,14 @@ A custom Wayland bar written in Rust + GTK4.
     - [Battery notifications](https://kota.nz/battery_notifications_with_udev.html)
     - Playerctl replacement (so the "current player" is consistent across keybinds and the bar)
 - Show USB devices battery if available (logitech mouse)
-- Use a consistent method of displaying errors (either all with `Display` or all with `Debug`)
+- Use a consistent method of displaying errors (all with `Display`)
+- Replace all Infaillible with !
 - Network: add ping with router and with internet
 - Network: if ping with the routeur exceed a thresold, disconnect and reconnect (in Daemon)
 - Cpu: make orange when 1 core is at 100%
+- Integration with upower ?
+- Mpris: icons using DesktopEntry
+- Mpris: scrolling text (https://github.com/Aylur/astal/pull/291/changes)
 
 ## Other known issues
 
