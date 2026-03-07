@@ -1,6 +1,6 @@
 use std::{
 	cell::Cell,
-	net::IpAddr,
+	net::{IpAddr, Ipv4Addr},
 	rc::Rc,
 	time::{Duration, SystemTime},
 };
@@ -14,12 +14,14 @@ use gtk::{
 use gtk4 as gtk;
 use libc::RT_TABLE_MAIN;
 use log::error;
-use netlink_packet_route::{
-	address::AddressAttribute,
-	link::{LinkAttribute, State},
-	route::RouteAttribute,
+use rtnetlink::{
+	RouteMessageBuilder,
+	packet_route::{
+		address::AddressAttribute,
+		link::{LinkAttribute, State},
+		route::RouteAttribute,
+	},
 };
-use rtnetlink::IpVersion;
 use wl_nl80211::{Nl80211Attr, Nl80211BssInfo, Nl80211Element};
 
 use crate::{FormatFixed, HasTooltip, backend::rfkill};
@@ -246,7 +248,10 @@ async fn default_route(
 ) -> Option<Route> {
 	let mut candidates = Vec::new();
 
-	let mut all_routes = route_handle.route().get(IpVersion::V4).execute();
+	let mut all_routes = route_handle
+		.route()
+		.get(RouteMessageBuilder::<Ipv4Addr>::new().build())
+		.execute();
 	while let Ok(Some(route)) = all_routes.try_next().await {
 		if route.header.table != RT_TABLE_MAIN {
 			continue;
