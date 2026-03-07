@@ -131,8 +131,8 @@ impl Device {
 	pub fn brightness(&self) -> anyhow::Result<u32> {
 		Ok(self
 			.inner
-			.attribute_value("actual_brightness")
-			.context("Missing attribute `actual_brightness` on device")?
+			.attribute_value("brightness")
+			.context("Missing attribute `brightness` on device")?
 			.to_str()
 			.context("Invalid utf8")?
 			.parse()?)
